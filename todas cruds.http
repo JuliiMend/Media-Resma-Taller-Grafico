@@ -1,0 +1,261 @@
+### Variables
+@host = http://localhost:4000/api
+
+# ==========================================
+# 1. USUARIOS
+# ==========================================
+
+### Crear Usuario
+POST {{host}}/usuarios
+Content-Type: application/json
+
+{
+  "nombre": "Admin Taller",
+  "activo": true
+}
+
+### Listar Usuarios
+GET {{host}}/usuarios
+
+### Obtener Usuario por ID
+GET {{host}}/usuarios/1
+
+### Actualizar Usuario (PATCH)
+PATCH {{host}}/usuarios/1
+Content-Type: application/json
+
+{
+  "nombre": "Admin Taller (Actualizado)"
+}
+
+### Eliminar Usuario
+DELETE {{host}}/usuarios/1
+
+
+# ==========================================
+# 2. CLIENTES
+# ==========================================
+
+### Crear Cliente
+POST {{host}}/clientes
+Content-Type: application/json
+
+{
+  "nombre": "Cliente de Prueba",
+  "telefono": "3415550000"
+}
+
+### Listar Clientes
+GET {{host}}/clientes
+
+### Obtener Cliente por ID
+GET {{host}}/clientes/1
+
+### Actualizar Cliente (PATCH)
+PATCH {{host}}/clientes/3
+Content-Type: application/json
+
+{
+  "notas": "Se le actualizó la nota mediante PATCH"
+}
+
+### Eliminar Cliente
+DELETE {{host}}/clientes/3
+
+
+# ==========================================
+# 3. INSUMOS
+# ==========================================
+
+### Crear Insumo
+POST {{host}}/insumos
+Content-Type: application/json
+
+{
+  "nombre": "Tinta Negra",
+  "unidad": "litros",
+  "stockActual": 5,
+  "stockMinimo": 2,
+  "precioUnitario": 15000
+}
+
+### Listar Insumos
+GET {{host}}/insumos
+
+### Obtener Insumo por ID
+GET {{host}}/insumos/1
+
+### Actualizar Insumo (PATCH)
+PATCH {{host}}/insumos/1
+Content-Type: application/json
+
+{
+  "stockActual": 4
+}
+
+### Eliminar Insumo
+DELETE {{host}}/insumos/1
+
+
+# ==========================================
+# 4. COMPRAS (Basado en tu captura)
+# ==========================================
+
+### Crear Compra (Requiere que exista el Insumo ID 1)
+POST {{host}}/compras
+Content-Type: application/json
+
+{
+  "insumoId": 2,
+  "cantidad": 2,
+  "precio": 30000,
+  "medioPago": "Transferencia"
+}
+
+### Listar Compras
+GET {{host}}/compras
+
+### Obtener Compra por ID
+GET {{host}}/compras/1
+
+### Actualizar Compra (PATCH)
+PATCH {{host}}/compras/1
+Content-Type: application/json
+
+{
+  "medioPago": "Efectivo"
+}
+
+### Eliminar Compra
+DELETE {{host}}/compras/1
+
+
+# ==========================================
+# 5. PRODUCTOS
+# ==========================================
+
+### Crear Producto
+POST {{host}}/productos
+Content-Type: application/json
+
+{
+  "nombre": "Lona Front 13oz",
+  "tipo": "Impresion",
+  "precioVenta": 8000
+}
+
+### Listar Productos
+GET {{host}}/productos
+
+### Obtener Producto por ID
+GET {{host}}/productos/1
+
+### Actualizar Producto (PATCH)
+PATCH {{host}}/productos/1
+Content-Type: application/json
+
+{
+  "precioVenta": 8500
+}
+
+### Eliminar Producto
+DELETE {{host}}/productos/1
+
+
+# ==========================================
+# 6. PEDIDOS
+# ==========================================
+
+### Crear Pedido (Requiere Cliente ID 1)
+POST {{host}}/pedidos
+Content-Type: application/json
+
+{
+  "clienteId": 1,
+  "estado": "PENDIENTE",
+  "sena": 4000,
+  "restaPagar": 4500,
+  "fechaEntrega": "2026-10-01T15:00:00.000Z"
+}
+
+### Listar Pedidos
+GET {{host}}/pedidos
+
+### Obtener Pedido por ID
+GET {{host}}/pedidos/1
+
+### Actualizar Pedido (PATCH)
+PATCH {{host}}/pedidos/1
+Content-Type: application/json
+
+{
+  "estado": "EN PROCESO",
+  "restaPagar": 0
+}
+
+### Eliminar Pedido
+DELETE {{host}}/pedidos/1
+
+
+# ==========================================
+# 7. TAREAS
+# ==========================================
+
+### Crear Tarea (Asignada al Pedido 1 opcionalmente)
+POST {{host}}/tareas
+Content-Type: application/json
+
+{
+  "titulo": "Diseñar lona",
+  "estado": "PENDIENTE",
+  "pedidoId": 2
+}
+
+### Listar Tareas
+GET {{host}}/tareas
+
+### Obtener Tarea por ID
+GET {{host}}/tareas/1
+
+### Actualizar Tarea (PATCH)
+PATCH {{host}}/tareas/1
+Content-Type: application/json
+
+{
+  "estado": "COMPLETADA"
+}
+
+### Eliminar Tarea
+DELETE {{host}}/tareas/1
+
+
+# ==========================================
+# 8. GASTOS
+# ==========================================
+
+### Crear Gasto
+POST {{host}}/gastos
+Content-Type: application/json
+
+{
+  "concepto": "Luz EPE",
+  "monto": 12500,
+  "medioPago": "Débito"
+}
+
+### Listar Gastos
+GET {{host}}/gastos
+
+### Obtener Gasto por ID
+GET {{host}}/gastos/1
+
+### Actualizar Gasto (PATCH)
+PATCH {{host}}/gastos/1
+Content-Type: application/json
+
+{
+  "monto": 13000
+}
+
+### Eliminar Gasto
+DELETE {{host}}/gastos/1

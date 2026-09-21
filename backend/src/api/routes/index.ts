@@ -1,0 +1,30 @@
+import { Router } from "express";
+import { insumoRouter } from "./insumo.routes";
+import { usuarioRouter } from "./usuario.routes";
+import { clienteRouter } from "./cliente.routes";
+import { productoRouter } from "./producto.routes";
+import { productoInsumoRouter } from "./productoInsumo.routes";
+import { pedidoRouter } from "./pedido.routes";
+import { trabajoRouter } from "./trabajo.routes";
+import { compraRouter } from "./compra.routes";
+import { movimientoStockRouter } from "./movimientoStock.routes";
+import { tareaRouter } from "./tarea.routes";
+import { gastoRouter } from "./gasto.routes";
+import { historialRouter } from "./historial.routes";
+import { alertaRouter } from "./alerta.routes";
+
+export const apiRouter = Router();
+
+apiRouter.use("/insumos", insumoRouter);
+apiRouter.use("/usuarios", usuarioRouter);
+apiRouter.use("/clientes", clienteRouter);
+apiRouter.use("/productos", productoRouter);
+apiRouter.use("/productos-insumos", productoInsumoRouter);
+apiRouter.use("/pedidos", pedidoRouter);
+apiRouter.use("/trabajos", trabajoRouter);
+apiRouter.use("/compras", compraRouter);
+apiRouter.use("/movimientos-stock", movimientoStockRouter);
+apiRouter.use("/tareas", tareaRouter);
+apiRouter.use("/gastos", gastoRouter);
+apiRouter.use("/historial", historialRouter);
+apiRouter.use("/alertas", alertaRouter);

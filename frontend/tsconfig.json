@@ -11,8 +11,10 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "strict": true,
-    "baseUrl": ".",
+    "baseUrl": "../../Media Resma Taller Grafico/frontend",
     "paths": { "@/*": ["src/*"] }
   },
-  "include": ["src"]
+  "include": [
+    "../../Media Resma Taller Grafico/frontend/src"
+  ]
 }

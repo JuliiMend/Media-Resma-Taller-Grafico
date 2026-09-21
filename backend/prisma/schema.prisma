@@ -1,8 +1,3 @@
-// ==========================================================
-// Schema inicial - Sistema de stock, pedidos y costos
-// Imprenta / gráfica - uso personal, SQLite, sin auth
-// ==========================================================
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,102 +8,113 @@ datasource db {
 }
 
 model Usuario {
-  id      Int      @id @default(autoincrement())
-  nombre  String
-  activo  Boolean  @default(true)
+  id         Int     @id @default(autoincrement())
+  nombre     String
+  fotoPerfil String?
+  activo     Boolean @default(true)
+
+  pedidos    Pedido[]
+  tareas     Tarea[]
+  trabajos   Trabajo[]
+  historials Historial[]
+}
+
+model Cliente {
+  id           Int      @id @default(autoincrement())
+  nombre       String
+  userContacto String?
+  telefono     String?
+  notas        String?
+  creadoEn     DateTime @default(now())
 
   pedidos Pedido[]
 }
 
-model Cliente {
-  id        Int      @id @default(autoincrement())
-  nombre    String
-  telefono  String?
-  notas     String?
-  creadoEn  DateTime @default(now())
-
-  pedidos   Pedido[]
-}
-
 model Insumo {
-  id              Int      @id @default(autoincrement())
-  nombre          String
-  unidad          String
-  stockActual     Decimal  @default(0)
-  stockMinimo     Decimal  @default(0)
-  precioUnitario  Decimal  @default(0)
-  proveedor       String?
-  activo          Boolean  @default(true)
+  id             Int     @id @default(autoincrement())
+  nombre         String
+  unidad         String
+  stockActual    Decimal @default(0)
+  stockMinimo    Decimal @default(0)
+  precioUnitario Decimal @default(0)
+  proveedor      String?
+  activo         Boolean @default(true)
 
-  recetas         ProductoInsumo[]
-  compras         Compra[]
-  movimientos     MovimientoStock[]
+  recetas     ProductoInsumo[]
+  compras     Compra[]
+  movimientos MovimientoStock[]
 }
 
 model Producto {
-  id           Int      @id @default(autoincrement())
-  nombre       String
-  tipo         String
-  descripcion  String?
-  precioVenta  Decimal?
-  activo       Boolean  @default(true)
+  id          Int      @id @default(autoincrement())
+  nombre      String
+  tipo        String
+  descripcion String?
+  precioVenta Decimal?
+  activo      Boolean  @default(true)
 
-  receta       ProductoInsumo[]
-  trabajos     Trabajo[]
+  receta   ProductoInsumo[]
+  trabajos Trabajo[]
 }
 
 model ProductoInsumo {
-  id                Int      @id @default(autoincrement())
+  id                Int     @id @default(autoincrement())
   productoId        Int
   insumoId          Int
   cantidadPorUnidad Decimal
 
-  producto          Producto @relation(fields: [productoId], references: [id])
-  insumo            Insumo   @relation(fields: [insumoId], references: [id])
+  producto Producto @relation(fields: [productoId], references: [id])
+  insumo   Insumo   @relation(fields: [insumoId], references: [id])
 
   @@unique([productoId, insumoId])
 }
 
 model Pedido {
-  id              Int       @id @default(autoincrement())
-  clienteId       Int
-  usuarioId       Int?
-  fecha           DateTime  @default(now())
-  estado          String
-  sena            Decimal?  @default(0)
-  restaPagar      Decimal?  @default(0)
-  medioPago       String?
-  envio           Decimal?
-  observaciones   String?
+  id            Int       @id @default(autoincrement())
+  clienteId     Int
+  usuarioId     Int?
+  fecha         DateTime  @default(now())
+  estado        String    @default("PENDIENTE")
+  fechaEntrega  DateTime?
+  sena          Decimal?  @default(0)
+  restaPagar    Decimal?  @default(0)
+  medioPago     String?
+  envio         Decimal?
+  observaciones String?
+  canalVenta    String?
 
-  cliente         Cliente   @relation(fields: [clienteId], references: [id])
-  usuario         Usuario?  @relation(fields: [usuarioId], references: [id])
-  trabajos        Trabajo[]
+  cliente  Cliente   @relation(fields: [clienteId], references: [id])
+  usuario  Usuario?  @relation(fields: [usuarioId], references: [id])
+  trabajos Trabajo[]
+  tareas   Tarea[]
 }
 
 model Trabajo {
-  id               Int       @id @default(autoincrement())
-  pedidoId         Int
-  productoId       Int?
-  descripcion      String
-  cantidad         Decimal   @default(1)
-  valorUnitario    Decimal
-  estadoProducto   String?
+  id             Int      @id @default(autoincrement())
+  pedidoId       Int
+  productoId     Int?
+  descripcion    String
+  cantidad       Decimal  @default(1)
+  valorUnitario  Decimal
+  estadoProducto String?
+  costoUnitario  Decimal?
 
-  pedido           Pedido    @relation(fields: [pedidoId], references: [id])
-  producto         Producto? @relation(fields: [productoId], references: [id])
-  movimientos      MovimientoStock[]
+  usuarioId   Int?
+  usuario     Usuario?          @relation(fields: [usuarioId], references: [id])
+  pedido      Pedido            @relation(fields: [pedidoId], references: [id])
+  producto    Producto?         @relation(fields: [productoId], references: [id])
+  movimientos MovimientoStock[]
 }
 
 model Compra {
-  id         Int      @id @default(autoincrement())
-  insumoId   Int
-  fecha      DateTime @default(now())
-  cantidad   Decimal
-  precio     Decimal
-  medioPago  String?
+  id        Int      @id @default(autoincrement())
+  insumoId  Int
+  fecha     DateTime @default(now())
+  cantidad  Decimal
+  precio    Decimal
+  medioPago String?
 
-  insumo     Insumo   @relation(fields: [insumoId], references: [id])
+  insumo Insumo @relation(fields: [insumoId], references: [id])
 }
 
 model MovimientoStock {
@@ -119,6 +125,41 @@ model MovimientoStock {
   cantidad  Decimal
   fecha     DateTime @default(now())
 
-  insumo    Insumo   @relation(fields: [insumoId], references: [id])
-  trabajo   Trabajo? @relation(fields: [trabajoId], references: [id])
+  insumo  Insumo   @relation(fields: [insumoId], references: [id])
+  trabajo Trabajo? @relation(fields: [trabajoId], references: [id])
+}
+
+model Tarea {
+  id          Int       @id @default(autoincrement())
+  titulo      String
+  descripcion String?
+  estado      String    @default("PENDIENTE")
+  fechaLimite DateTime?
+  creadoEn    DateTime  @default(now())
+
+  usuarioId Int?
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id])
+
+  pedidoId Int?
+  pedido   Pedido? @relation(fields: [pedidoId], references: [id])
+}
+
+model Gasto {
+  id        Int      @id @default(autoincrement())
+  concepto  String
+  monto     Decimal
+  fecha     DateTime @default(now())
+  medioPago String?
+}
+
+model Historial {
+  id        Int      @id @default(autoincrement())
+  fecha     DateTime @default(now())
+  accion    String
+  entidad   String
+  entidadId Int
+  detalle   String
+
+  usuarioId Int
+  usuario   Usuario @relation(fields: [usuarioId], references: [id])
 }
