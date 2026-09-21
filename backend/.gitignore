@@ -4,3 +4,5 @@ dist
 *.db
 *.db-journal
 .idea/
+prisma/dev.db
+prisma/dev.db-journal

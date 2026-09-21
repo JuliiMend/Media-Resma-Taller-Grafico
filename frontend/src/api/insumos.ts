@@ -1,8 +1,6 @@
 import { api } from "./client";
-import { Insumo, CrearInsumoInput } from "../types/insumo";
+import { Insumo, CrearInsumoInput } from "../../../../Media Resma Taller Grafico/frontend/src/types/insumo";
 
-// Un archivo por entidad, con una función por endpoint.
-// Repetí este patrón para clientes.ts, productos.ts, pedidos.ts
 export const insumosApi = {
   listar: () => api.get<Insumo[]>("/insumos").then((r) => r.data),
   obtener: (id: number) => api.get<Insumo>(`/insumos/${id}`).then((r) => r.data),

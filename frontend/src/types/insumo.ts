@@ -1,4 +1,3 @@
-// Refleja el modelo Insumo de prisma/schema.prisma en el backend.
 export interface Insumo {
   id: number;
   nombre: string;

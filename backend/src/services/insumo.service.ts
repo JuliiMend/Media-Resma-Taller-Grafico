@@ -1,9 +1,6 @@
 import { insumoRepository } from "../repositories/insumo.repository";
 import { CrearInsumoInput, ActualizarInsumoInput } from "../schemas/insumo.schema";
 
-// Acá va la lógica de negocio. Los CRUDs simples solo delegan al
-// repositorio, pero funciones como "stock bajo" viven acá porque
-// no son una operación pura de base de datos.
 export const insumoService = {
   listar: () => insumoRepository.findAll(),
 

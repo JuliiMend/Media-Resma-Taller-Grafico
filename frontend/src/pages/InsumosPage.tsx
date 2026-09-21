@@ -1,10 +1,7 @@
 import { useEffect, useState } from "react";
 import { insumosApi } from "../api/insumos";
-import { Insumo } from "../types/insumo";
+import { Insumo } from "../../../../Media Resma Taller Grafico/frontend/src/types/insumo";
 
-// Página de ejemplo: lista los insumos y marca en rojo los que
-// están por debajo del stock mínimo. Usá esto como plantilla
-// para las páginas de Clientes, Productos y Pedidos.
 export default function InsumosPage() {
   const [insumos, setInsumos] = useState<Insumo[]>([]);
   const [cargando, setCargando] = useState(true);

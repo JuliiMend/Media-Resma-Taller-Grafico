@@ -1,0 +1,75 @@
+### Variables
+@host = http://localhost:4000/api
+
+### 1. Crear un Cliente
+POST {{host}}/clientes
+Content-Type: application/json
+
+{
+  "nombre": "Estudio Creativo Norte",
+  "userContacto": "@estudionorte",
+  "telefono": "3415551234",
+  "notas": "Cliente habitual, suele pedir facturas A."
+}
+
+### 2. Crear un Insumo (con alerta de stock)
+POST {{host}}/insumos
+Content-Type: application/json
+
+{
+  "nombre": "Rollo Vinilo Blanco Brillante",
+  "unidad": "metros",
+  "stockActual": 3,
+  "stockMinimo": 10,
+  "precioUnitario": 1200,
+  "proveedor": "Insumos Gráficos SRL"
+}
+
+### 3. Crear un Producto (Opcional)
+POST {{host}}/productos
+Content-Type: application/json
+
+{
+  "nombre": "Plancha Stickers Troquelados 5x5cm",
+  "tipo": "Impresion",
+  "descripcion": "Stickers en vinilo base blanca, resistentes al agua.",
+  "precioVenta": 5000
+}
+
+### 4. Crear un Pedido (con su Trabajo anidado y fecha próxima)
+POST {{host}}/pedidos
+Content-Type: application/json
+
+{
+  "clienteId": 1,
+  "estado": "PENDIENTE",
+  "sena": 2500,
+  "restaPagar": 2500,
+  "fechaEntrega": "2026-09-22T15:00:00.000Z",
+  "medioPago": "Transferencia",
+  "canalVenta": "Instagram",
+  "trabajos": [
+    {
+      "productoId": 1,
+      "descripcion": "Impresión de stickers para evento del sábado",
+      "cantidad": 2,
+      "valorUnitario": 5000,
+      "estadoProducto": "DISEÑO"
+    }
+  ]
+}
+
+### 5. Crear una Tarea (próxima a vencer)
+POST {{host}}/tareas
+Content-Type: application/json
+
+{
+  "titulo": "Revisar vectores y plottear",
+  "descripcion": "Preparar los archivos del Pedido 1 y mandarlos a corte.",
+  "estado": "PENDIENTE",
+  "fechaLimite": "2026-09-22T15:00:00.000Z",
+  "pedidoId": 1
+}
+
+### 6. Chequear y disparar alertas
+GET {{host}}/alertas/chequear
