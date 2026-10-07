@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { CrearPedidoInput, ActualizarPedidoInput } from "@/schemas/pedido.schema";
 const prisma = new PrismaClient();
 
 export const pedidoRepository = {

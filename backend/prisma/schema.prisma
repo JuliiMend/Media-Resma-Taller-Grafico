@@ -9,10 +9,12 @@ datasource db {
 }
 
 model Usuario {
-  id         Int     @id @default(autoincrement())
-  nombre     String
-  fotoPerfil String?
-  activo     Boolean @default(true)
+  id           Int     @id @default(autoincrement())
+  nombre       String
+  email        String  @unique
+  passwordHash String
+  fotoPerfil   String?
+  activo       Boolean @default(true)
 
   pedidos    Pedido[]
   tareas     Tarea[]
