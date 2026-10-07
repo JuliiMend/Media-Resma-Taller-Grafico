@@ -1,5 +1,5 @@
-import { prisma } from "../config/db";
-import { CrearUsuarioInput, ActualizarUsuarioInput } from "../schemas/usuario.schema";
+import { prisma } from "@/config/db";
+import { CrearUsuarioInput, ActualizarUsuarioInput } from "@/schemas/usuario.schema";
 
 export const usuarioRepository = {
   findAll: () => prisma.usuario.findMany({ orderBy: { nombre: "asc" } }),
