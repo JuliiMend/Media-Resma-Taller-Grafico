@@ -2,10 +2,11 @@ import express from "express";
 import cors from "cors";
 import { apiRouter } from "./api/routes";
 import { errorHandler } from "./api/middlewares/error.middleware";
+import {env} from "@/config/env";
 
 export const app = express();
 
-app.use(cors());
+app.use(cors({ origin: env.corsOrigin }));
 app.use(express.json());
 
 app.get('/', (req, res) => {
@@ -21,3 +22,4 @@ app.get('/api/health', (req, res) => {
 
 app.use("/api", apiRouter);
 app.use(errorHandler);
+
