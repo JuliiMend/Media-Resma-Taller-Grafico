@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
-import { verificarToken } from "@/utils/jwt";
-import { HttpError } from "@/utils/http-error";
+import { verificarToken } from "../../utils/jwt";
+import { HttpError } from "../../utils/http-error";
 
 declare global {
     namespace Express {
