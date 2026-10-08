@@ -5,6 +5,28 @@ export interface Usuario {
   id: number;
   nombre: string;
   email: string;
+  fotoPerfil?: string | null;
+  activo?: boolean;
+}
+
+export interface Compra {
+  id: number;
+  insumoId: number;
+  fecha: string;
+  cantidad: Decimal;
+  precio: Decimal;
+  medioPago?: string | null;
+}
+
+export interface HistorialEntry {
+  id: number;
+  fecha: string;
+  accion: string;
+  entidad: string;
+  entidadId: number;
+  detalle: string;
+  usuarioId: number;
+  usuario?: { id: number; nombre: string; email: string } | null;
 }
 
 export interface Cliente {

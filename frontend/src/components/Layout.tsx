@@ -2,17 +2,21 @@ import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   ClipboardList,
+  History,
   LayoutDashboard,
   LogOut,
   Menu,
   Package,
   Receipt,
   ShoppingBag,
+  ShoppingCart,
   SquareCheck,
   Users,
   X,
 } from "lucide-react";
 import { useAuth } from "@/auth/AuthContext";
+import { useProfile } from "@/auth/useProfile";
+import { Avatar } from "@/components/Avatar";
 import { Logo } from "@/components/Logo";
 import { cn } from "@/lib/format";
 
@@ -23,7 +27,9 @@ const NAV = [
   { to: "/clientes", label: "Clientes", icon: Users },
   { to: "/productos", label: "Productos", icon: ShoppingBag },
   { to: "/tareas", label: "Tareas", icon: SquareCheck },
+  { to: "/compras", label: "Compras", icon: ShoppingCart },
   { to: "/gastos", label: "Gastos", icon: Receipt },
+  { to: "/historial", label: "Historial", icon: History },
 ];
 
 function NavItems({ onNavigate }: { onNavigate?: () => void }) {
@@ -51,7 +57,8 @@ function NavItems({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 export function Layout() {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
+  const { profile } = useProfile();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -62,10 +69,18 @@ export function Layout() {
 
   const userBlock = (
     <div className="flex items-center justify-between gap-2 border-t border-line pt-4">
-      <div className="min-w-0">
-        <p className="truncate text-sm font-semibold">{user?.nombre ?? "Usuario"}</p>
-        <p className="truncate text-xs text-muted">{user?.email}</p>
-      </div>
+      <NavLink
+        to="/perfil"
+        onClick={() => setMobileOpen(false)}
+        className="-m-1.5 flex min-w-0 flex-1 items-center gap-3 rounded-xl p-1.5 hover:bg-ink/5"
+        aria-label="Mi perfil"
+      >
+        <Avatar name={profile?.nombre} src={profile?.fotoPerfil} />
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-semibold">{profile?.nombre ?? "Usuario"}</span>
+          <span className="block truncate text-xs text-muted">{profile?.email}</span>
+        </span>
+      </NavLink>
       <button
         type="button"
         onClick={handleLogout}

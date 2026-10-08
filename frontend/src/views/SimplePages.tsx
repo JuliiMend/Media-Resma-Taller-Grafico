@@ -1,8 +1,8 @@
 import { AlertTriangle } from "lucide-react";
 import { CrudPage } from "@/components/CrudPage";
 import { Badge } from "@/components/ui";
-import { formatDate, formatMoney, toNumber } from "@/lib/format";
-import type { Cliente, Gasto, Insumo, Producto } from "@/types";
+import { formatMoney, toNumber } from "@/lib/format";
+import type { Cliente, Insumo, Producto } from "@/types";
 
 export function ClientesPage() {
   return (
@@ -111,32 +111,3 @@ export function ProductosPage() {
   );
 }
 
-export function GastosPage() {
-  return (
-    <CrudPage<Gasto>
-      title="Gastos"
-      description="Registro de gastos del taller."
-      endpoint="/gastos"
-      singular="gasto"
-      searchKeys={["concepto", "medioPago"]}
-      summary={(items) => (
-        <div className="inline-flex flex-col rounded-xl border border-line bg-surface px-5 py-4">
-          <span className="text-xs text-muted">Total registrado</span>
-          <span className="text-xl font-semibold tabular-nums">{formatMoney(items.reduce((s, g) => s + toNumber(g.monto), 0))}</span>
-        </div>
-      )}
-      fields={[
-        { name: "concepto", label: "Concepto", type: "text", required: true, fullWidth: true },
-        { name: "monto", label: "Monto", type: "number", required: true },
-        { name: "fecha", label: "Fecha", type: "date", defaultValue: new Date().toISOString().slice(0, 10) },
-        { name: "medioPago", label: "Medio de pago", type: "text", placeholder: "Efectivo, transferencia…", fullWidth: true },
-      ]}
-      columns={[
-        { label: "Concepto", render: (g) => g.concepto, primary: true },
-        { label: "Fecha", render: (g) => formatDate(g.fecha) },
-        { label: "Medio de pago", render: (g) => g.medioPago || "—" },
-        { label: "Monto", align: "right", render: (g) => formatMoney(g.monto) },
-      ]}
-    />
-  );
-}

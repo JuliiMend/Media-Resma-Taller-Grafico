@@ -4,6 +4,7 @@ import { CalendarClock, Plus, Trash2 } from "lucide-react";
 import { api, fetcher, getErrorMessage } from "@/api/client";
 import { useAuth } from "@/auth/AuthContext";
 import { cn, formatDate } from "@/lib/format";
+import { useRegistrarHistorial } from "@/lib/useHistorial";
 import {
   Badge,
   Button,
@@ -26,6 +27,7 @@ export function TareasPage() {
   const { user } = useAuth();
   const { data, error, isLoading, mutate } = useSWR<Tarea[]>("/tareas", fetcher);
   const { data: pedidos } = useSWR<Pedido[]>("/pedidos", fetcher);
+  const registrar = useRegistrarHistorial();
   const [formOpen, setFormOpen] = useState(false);
   const [titulo, setTitulo] = useState("");
   const [descripcion, setDescripcion] = useState("");
@@ -60,7 +62,7 @@ export function TareasPage() {
     setSaving(true);
     setFormError(null);
     try {
-      await api.post("/tareas", {
+      const created = await api.post<Tarea>("/tareas", {
         titulo: titulo.trim(),
         descripcion: descripcion.trim() || undefined,
         estado: "PENDIENTE",
@@ -68,6 +70,7 @@ export function TareasPage() {
         pedidoId: pedidoId ? Number(pedidoId) : undefined,
         usuarioId: user?.id,
       });
+      void registrar("CREAR", "tarea", created.data.id, `Creó la tarea "${titulo.trim()}"${pedidoId ? ` (pedido #${pedidoId})` : ""}`);
       await mutate();
       setFormOpen(false);
     } catch (err) {
@@ -93,6 +96,7 @@ export function TareasPage() {
           revalidate: false,
         },
       );
+      void registrar(estado === DONE ? "COMPLETAR" : "EDITAR", "tarea", tarea.id, `${estado === DONE ? "Completó" : "Reabrió"} la tarea "${tarea.titulo}"`);
     } catch (err) {
       setActionError(getErrorMessage(err));
     } finally {
@@ -110,6 +114,7 @@ export function TareasPage() {
     setActionError(null);
     try {
       await api.delete(`/tareas/${toDelete.id}`);
+      void registrar("ELIMINAR", "tarea", toDelete.id, `Eliminó la tarea "${toDelete.titulo}"`);
       await mutate();
     } catch (err) {
       setActionError(getErrorMessage(err));

@@ -3,6 +3,7 @@ import useSWR from "swr";
 import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { api, fetcher, getErrorMessage } from "@/api/client";
 import { cn, toDateInput } from "@/lib/format";
+import { useRegistrarHistorial } from "@/lib/useHistorial";
 import {
   Button,
   ConfirmDialog,
@@ -29,6 +30,7 @@ export interface FieldDef {
   step?: string;
   defaultValue?: string | boolean;
   fullWidth?: boolean;
+  suggestions?: string[];
 }
 
 export interface ColumnDef<T> {
@@ -47,7 +49,9 @@ interface CrudPageProps<T extends { id: number }> {
   columns: ColumnDef<T>[];
   searchKeys: (keyof T)[];
   rowHighlight?: (item: T) => boolean;
-  summary?: (items: T[]) => ReactNode;
+  summary?: (items: T[], filtered: T[]) => ReactNode;
+  predicate?: (item: T) => boolean;
+  toolbar?: ReactNode;
 }
 
 type FormValues = Record<string, string | boolean>;
@@ -87,8 +91,11 @@ export function CrudPage<T extends { id: number }>({
   searchKeys,
   rowHighlight,
   summary,
+  predicate,
+  toolbar,
 }: CrudPageProps<T>) {
   const { data, error, isLoading, mutate } = useSWR<T[]>(endpoint, fetcher);
+  const registrar = useRegistrarHistorial();
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<T | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -100,11 +107,13 @@ export function CrudPage<T extends { id: number }>({
   const [actionError, setActionError] = useState<string | null>(null);
 
   const items = data ?? [];
+  const byPredicate = predicate ? items.filter(predicate) : items;
   const filtered = query
-    ? items.filter((item) =>
+    ? byPredicate.filter((item) =>
         searchKeys.some((k) => String(item[k] ?? "").toLowerCase().includes(query.toLowerCase())),
       )
-    : items;
+    : byPredicate;
+  const labelOf = (values: Record<string, unknown>) => String(values[fields[0].name] ?? "").trim();
 
   function openForm(item: T | null) {
     setEditing(item);
@@ -119,8 +128,15 @@ export function CrudPage<T extends { id: number }>({
     setFormError(null);
     try {
       const payload = formToPayload(values, fields);
-      if (editing) await api.patch(`${endpoint}/${editing.id}`, payload);
-      else await api.post(endpoint, payload);
+      const response = editing ? await api.patch(`${endpoint}/${editing.id}`, payload) : await api.post(endpoint, payload);
+      const savedId = editing ? editing.id : (response.data as { id?: number }).id;
+      const label = labelOf(payload);
+      void registrar(
+        editing ? "EDITAR" : "CREAR",
+        singular,
+        savedId,
+        `${editing ? "Editó" : "Creó"} ${singular}${label ? ` "${label}"` : ""}`,
+      );
       await mutate();
       setFormOpen(false);
     } catch (err) {
@@ -136,6 +152,8 @@ export function CrudPage<T extends { id: number }>({
     setActionError(null);
     try {
       await api.delete(`${endpoint}/${toDelete.id}`);
+      const label = labelOf(toDelete as Record<string, unknown>);
+      void registrar("ELIMINAR", singular, toDelete.id, `Eliminó ${singular}${label ? ` "${label}"` : ""}`);
       await mutate();
       setToDelete(null);
     } catch (err) {
@@ -162,18 +180,21 @@ export function CrudPage<T extends { id: number }>({
         }
       />
 
-      {summary && data && <div className="mb-6">{summary(items)}</div>}
+      {summary && data && <div className="mb-6">{summary(items, filtered)}</div>}
 
-      <div className="relative mb-4 max-w-sm">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden="true" />
-        <Input
-          type="search"
-          placeholder="Buscar…"
-          aria-label={`Buscar ${title.toLowerCase()}`}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="pl-9"
-        />
+      <div className="mb-4 flex flex-wrap items-end gap-3">
+        <div className="relative w-full max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden="true" />
+          <Input
+            type="search"
+            placeholder="Buscar…"
+            aria-label={`Buscar ${title.toLowerCase()}`}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        {toolbar}
       </div>
 
       {actionError && (
@@ -188,8 +209,8 @@ export function CrudPage<T extends { id: number }>({
         <ErrorBanner message={getErrorMessage(error)} onRetry={() => mutate()} />
       ) : filtered.length === 0 ? (
         <EmptyState
-          title={query ? "Sin resultados" : `Todavía no hay ${title.toLowerCase()}`}
-          description={query ? "Probá con otra búsqueda." : `Creá el primer ${singular} para empezar.`}
+          title={items.length > 0 ? "Sin resultados" : `Todavía no hay ${title.toLowerCase()}`}
+          description={items.length > 0 ? "Probá con otra búsqueda o ajustá los filtros." : `Creá el primer ${singular} para empezar.`}
         />
       ) : (
         <>
@@ -292,13 +313,23 @@ export function CrudPage<T extends { id: number }>({
                         ))}
                       </Select>
                     ) : (
-                      <Input
-                        {...common}
-                        type={f.type}
-                        step={f.type === "number" ? (f.step ?? "0.01") : undefined}
-                        min={f.type === "number" ? 0 : undefined}
-                        onChange={onChange}
-                      />
+                      <>
+                        <Input
+                          {...common}
+                          type={f.type}
+                          step={f.type === "number" ? (f.step ?? "0.01") : undefined}
+                          min={f.type === "number" ? 0 : undefined}
+                          list={f.suggestions ? `${id}-options` : undefined}
+                          onChange={onChange}
+                        />
+                        {f.suggestions && (
+                          <datalist id={`${id}-options`}>
+                            {f.suggestions.map((s) => (
+                              <option key={s} value={s} />
+                            ))}
+                          </datalist>
+                        )}
+                      </>
                     )}
                   </Field>
                 </div>

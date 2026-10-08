@@ -20,7 +20,6 @@ export const apiRouter = Router();
 
 apiRouter.use("/auth", authRouter);
 
-// Todo lo demás pasa por requireAuth antes de llegar a su router
 apiRouter.use("/insumos", requireAuth, insumoRouter);
 apiRouter.use("/usuarios", requireAuth, usuarioRouter);
 apiRouter.use("/clientes", requireAuth, clienteRouter);

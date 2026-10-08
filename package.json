@@ -1,10 +1,12 @@
 {
   "dependencies": {
     "bcryptjs": "^3.0.3",
-    "jsonwebtoken": "^9.0.3"
+    "jsonwebtoken": "^9.0.3",
+    "node-cron": "^4.6.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
-    "@types/jsonwebtoken": "^9.0.10"
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node-cron": "^3.0.11"
   }
 }

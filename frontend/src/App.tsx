@@ -7,7 +7,11 @@ import { DashboardPage } from "@/views/DashboardPage";
 import { LoginPage } from "@/views/LoginPage";
 import { PedidosPage } from "@/views/pedidos/PedidosPage";
 import { TareasPage } from "@/views/TareasPage";
-import { ClientesPage, GastosPage, InsumosPage, ProductosPage } from "@/views/SimplePages";
+import { ClientesPage, InsumosPage, ProductosPage } from "@/views/SimplePages";
+import { ComprasPage } from "@/views/ComprasPage";
+import { GastosPage } from "@/views/GastosPage";
+import { HistorialPage } from "@/views/HistorialPage";
+import { PerfilPage } from "@/views/PerfilPage";
 
 export default function App() {
   return (
@@ -25,6 +29,9 @@ export default function App() {
                 <Route path="/productos" element={<ProductosPage />} />
                 <Route path="/insumos" element={<InsumosPage />} />
                 <Route path="/gastos" element={<GastosPage />} />
+                <Route path="/compras" element={<ComprasPage />} />
+                <Route path="/historial" element={<HistorialPage />} />
+                <Route path="/perfil" element={<PerfilPage />} />
               </Route>
             </Route>
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

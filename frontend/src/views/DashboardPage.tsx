@@ -1,10 +1,10 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import useSWR from "swr";
 import { Link } from "react-router-dom";
-import { AlertTriangle, ArrowRight, CalendarClock, ClipboardList, SquareCheck } from "lucide-react";
-import { fetcher, getErrorMessage } from "@/api/client";
+import { AlertTriangle, ArrowRight, BellRing, CalendarClock, ClipboardList, SquareCheck } from "lucide-react";
+import { api, fetcher, getErrorMessage } from "@/api/client";
 import { useAuth } from "@/auth/AuthContext";
-import { Badge, Card, ErrorBanner, LoadingState, PageHeader } from "@/components/ui";
+import { Badge, Button, Card, ErrorBanner, LoadingState, PageHeader } from "@/components/ui";
 import { cn, formatDate, formatMoney, toNumber } from "@/lib/format";
 import type { Insumo, Pedido, Tarea } from "@/types";
 import { ESTADOS_PEDIDO } from "./pedidos/estados";
@@ -166,9 +166,30 @@ function TareasCard() {
 
 export function DashboardPage() {
   const { user } = useAuth();
+  const [checking, setChecking] = useState(false);
+  const [alertNotice, setAlertNotice] = useState<string | null>(null);
+  const [alertError, setAlertError] = useState<string | null>(null);
+
+  async function checkAlerts() {
+    setChecking(true);
+    setAlertNotice(null);
+    setAlertError(null);
+    try {
+      const { data } = await api.post<{ cantidad?: number; avisosGenerados?: number; message?: string }>("/alertas/chequear");
+      const count = data.cantidad ?? data.avisosGenerados;
+      setAlertNotice(data.message ?? (typeof count === "number" ? (count ? `${count} avisos generados` : "Todo al día, sin avisos") : "Revisión de alertas completada."));
+    } catch (err) {
+      setAlertError(getErrorMessage(err));
+    } finally {
+      setChecking(false);
+    }
+  }
+
   return (
     <div>
-      <PageHeader title="Dashboard" description={user?.nombre ? `Hola, ${user.nombre}. Este es el estado del taller.` : "Este es el estado del taller."} />
+      <PageHeader title="Dashboard" description={user?.nombre ? `Hola, ${user.nombre}. Este es el estado del taller.` : "Este es el estado del taller."} action={<Button variant="dark" onClick={checkAlerts} loading={checking}><BellRing className="size-4" /> Revisar alertas ahora</Button>} />
+      {alertNotice && <div role="status" className="mb-4 rounded-xl border border-success/20 bg-success-soft px-4 py-3 text-sm text-success">{alertNotice}</div>}
+      {alertError && <div className="mb-4"><ErrorBanner message={alertError} /></div>}
       <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
         <PedidosCard />
         <InsumosCriticosCard />
