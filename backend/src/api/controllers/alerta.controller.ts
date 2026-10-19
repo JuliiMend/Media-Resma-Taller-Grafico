@@ -1,8 +1,8 @@
 import { Request, Response } from "express";
-import { alertaService } from "../../services/alerta.service";
 import { asyncHandler } from "../../utils/asyncHandler";
+import { alertaService } from "../../services/alerta.service";
 
-export const chequearAlertas = asyncHandler(async (_req: Request, res: Response) => {
+export const chequearAlertas = asyncHandler(async (req: Request, res: Response) => {
   const resultado = await alertaService.chequear();
-  res.json(resultado);
+  res.json({ ok: true, resultado });
 });

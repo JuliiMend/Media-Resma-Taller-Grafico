@@ -5,6 +5,28 @@ export interface Usuario {
   id: number;
   nombre: string;
   email: string;
+  fotoPerfil?: string | null;
+  activo?: boolean;
+}
+
+export interface Compra {
+  id: number;
+  insumoId: number;
+  fecha: string;
+  cantidad: Decimal;
+  precio: Decimal;
+  medioPago?: string | null;
+}
+
+export interface HistorialEntry {
+  id: number;
+  fecha: string;
+  accion: string;
+  entidad: string;
+  entidadId: number;
+  detalle: string;
+  usuarioId: number;
+  usuario?: { id: number; nombre: string; email: string } | null;
 }
 
 export interface Cliente {
@@ -13,6 +35,7 @@ export interface Cliente {
   telefono?: string | null;
   userContacto?: string | null;
   notas?: string | null;
+  activo?: boolean;
 }
 
 export interface Insumo {
@@ -23,6 +46,7 @@ export interface Insumo {
   stockMinimo: Decimal;
   precioUnitario: Decimal;
   proveedor?: string | null;
+  activo?: boolean;
 }
 
 export type TipoProducto = "PROPIO" | "TERCERIZADO";
@@ -33,6 +57,8 @@ export interface Producto {
   nombre: string;
   descripcion?: string | null;
   precioVenta: Decimal;
+  costo?: Decimal | null;
+  unidad: string;
   activo: boolean;
 }
 
@@ -51,6 +77,7 @@ export interface Trabajo {
   descripcion: string;
   cantidad: Decimal;
   valorUnitario: Decimal;
+  costoUnitario?: Decimal | null;
   estadoProducto?: string | null;
 }
 
@@ -68,6 +95,20 @@ export interface Pedido {
   observaciones?: string | null;
   cliente?: Cliente;
   trabajos?: Trabajo[];
+  total?: Decimal | null;
+  costoTotal?: Decimal | null;
+  ganancia?: Decimal | null;
+}
+
+export interface FilaVenta {
+  mes: string;
+  productoId: number | null;
+  producto: string;
+  unidad: string;
+  cantidad: Decimal;
+  ingresos: Decimal;
+  costo: Decimal;
+  ganancia: Decimal;
 }
 
 export interface Tarea {

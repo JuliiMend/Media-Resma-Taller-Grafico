@@ -1,4 +1,4 @@
-import { prisma } from "../config/prisma";
+import { prisma } from "../config/db";
 import { hashPassword, compararPassword } from "../utils/password";
 import { generarToken } from "../utils/jwt";
 import { HttpError } from "../utils/http-error";

@@ -4,6 +4,7 @@ import { CalendarClock, Plus, Trash2 } from "lucide-react";
 import { api, fetcher, getErrorMessage } from "@/api/client";
 import { useAuth } from "@/auth/AuthContext";
 import { cn, formatDate } from "@/lib/format";
+import { useRegistrarHistorial } from "@/lib/useHistorial";
 import {
   Badge,
   Button,
@@ -18,6 +19,7 @@ import {
   Select,
   Textarea,
 } from "@/components/ui";
+import { Pagination, paginate } from "@/components/Pagination";
 import type { Pedido, Tarea } from "@/types";
 
 const DONE = "COMPLETADA";
@@ -26,6 +28,7 @@ export function TareasPage() {
   const { user } = useAuth();
   const { data, error, isLoading, mutate } = useSWR<Tarea[]>("/tareas", fetcher);
   const { data: pedidos } = useSWR<Pedido[]>("/pedidos", fetcher);
+  const registrar = useRegistrarHistorial();
   const [formOpen, setFormOpen] = useState(false);
   const [titulo, setTitulo] = useState("");
   const [descripcion, setDescripcion] = useState("");
@@ -37,6 +40,8 @@ export function TareasPage() {
   const [deleting, setDeleting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingIds, setPendingIds] = useState<Set<number>>(new Set());
+  const [pagePendientes, setPagePendientes] = useState(1);
+  const [pageCompletadas, setPageCompletadas] = useState(1);
 
   const tareas = data ?? [];
   const pendientes = tareas.filter((t) => t.estado !== DONE);
@@ -60,7 +65,7 @@ export function TareasPage() {
     setSaving(true);
     setFormError(null);
     try {
-      await api.post("/tareas", {
+      const created = await api.post<Tarea>("/tareas", {
         titulo: titulo.trim(),
         descripcion: descripcion.trim() || undefined,
         estado: "PENDIENTE",
@@ -68,6 +73,7 @@ export function TareasPage() {
         pedidoId: pedidoId ? Number(pedidoId) : undefined,
         usuarioId: user?.id,
       });
+      void registrar("CREAR", "tarea", created.data.id, `Creó la tarea "${titulo.trim()}"${pedidoId ? ` (pedido #${pedidoId})` : ""}`);
       await mutate();
       setFormOpen(false);
     } catch (err) {
@@ -93,6 +99,7 @@ export function TareasPage() {
           revalidate: false,
         },
       );
+      void registrar(estado === DONE ? "COMPLETAR" : "EDITAR", "tarea", tarea.id, `${estado === DONE ? "Completó" : "Reabrió"} la tarea "${tarea.titulo}"`);
     } catch (err) {
       setActionError(getErrorMessage(err));
     } finally {
@@ -110,6 +117,7 @@ export function TareasPage() {
     setActionError(null);
     try {
       await api.delete(`/tareas/${toDelete.id}`);
+      void registrar("ELIMINAR", "tarea", toDelete.id, `Eliminó la tarea "${toDelete.titulo}"`);
       await mutate();
     } catch (err) {
       setActionError(getErrorMessage(err));
@@ -195,14 +203,32 @@ export function TareasPage() {
             <h2 id="pendientes-title" className="mb-3 text-sm font-semibold text-muted">
               Pendientes ({pendientes.length})
             </h2>
-            {pendientes.length ? renderList(pendientes) : <p className="text-sm text-muted">No hay tareas pendientes.</p>}
+            {pendientes.length ? (
+              <>
+                {renderList(paginate(pendientes, pagePendientes))}
+                <Pagination
+                  total={pendientes.length}
+                  page={pagePendientes}
+                  onPageChange={setPagePendientes}
+                  noun={{ one: "tarea pendiente", many: "tareas pendientes" }}
+                />
+              </>
+            ) : (
+              <p className="text-sm text-muted">No hay tareas pendientes.</p>
+            )}
           </section>
           {completadas.length > 0 && (
             <section aria-labelledby="completadas-title">
               <h2 id="completadas-title" className="mb-3 text-sm font-semibold text-muted">
                 Completadas ({completadas.length})
               </h2>
-              {renderList(completadas)}
+              {renderList(paginate(completadas, pageCompletadas))}
+              <Pagination
+                total={completadas.length}
+                page={pageCompletadas}
+                onPageChange={setPageCompletadas}
+                noun={{ one: "tarea completada", many: "tareas completadas" }}
+              />
             </section>
           )}
         </div>

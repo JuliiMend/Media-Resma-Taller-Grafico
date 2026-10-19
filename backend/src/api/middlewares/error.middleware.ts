@@ -14,13 +14,16 @@ export function errorHandler(
     return res.status(409).json({ error: "Ya existe un registro con ese valor único" });
   }
   if (err.code === "P2003") {
-    return res
-      .status(409)
-      .json({ error: "No se puede completar la operación: tiene registros relacionados" });
+    return res.status(409).json({
+      error: "No se puede borrar porque tiene registros asociados. Archivalo en su lugar.",
+      code: "TIENE_RELACIONES",
+    });
   }
 
   if (err instanceof HttpError) {
-    return res.status(err.status).json({ error: err.message });
+    return res
+      .status(err.status)
+      .json({ error: err.message, ...(err.code ? { code: err.code } : {}) });
   }
 
   console.error(err);

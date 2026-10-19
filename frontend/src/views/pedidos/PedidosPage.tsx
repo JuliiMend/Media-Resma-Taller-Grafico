@@ -4,6 +4,7 @@ import { ChevronRight, Plus } from "lucide-react";
 import { api, fetcher, getErrorMessage } from "@/api/client";
 import { cn, formatDate, formatMoney, toNumber } from "@/lib/format";
 import { Badge, Button, ConfirmDialog, EmptyState, ErrorBanner, LoadingState, PageHeader } from "@/components/ui";
+import { Pagination, clampPage, paginate } from "@/components/Pagination";
 import type { Cliente, Pedido, Producto } from "@/types";
 import { ESTADOS_PEDIDO, estadoInfo } from "./estados";
 import { PedidoDetailModal } from "./PedidoDetailModal";
@@ -15,10 +16,12 @@ export function PedidosPage() {
   const { data: productos } = useSWR<Producto[]>("/productos", fetcher);
   const [filtro, setFiltro] = useState<string>("ACTIVOS");
   const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<Pedido | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [toDelete, setToDelete] = useState<Pedido | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   const clientesById = useMemo(() => new Map((clientes ?? []).map((c) => [c.id, c])), [clientes]);
   const list = pedidos ?? [];
@@ -28,6 +31,8 @@ export function PedidosPage() {
     return p.estado === filtro;
   });
   const selected = list.find((p) => p.id === selectedId) ?? null;
+  const step = clampPage(page, filtered.length);
+  const pagina = paginate(filtered, page);
 
   const activos = list.filter((p) => p.estado !== "ENTREGADO" && p.estado !== "CANCELADO").length;
   const saldoPendiente = list.filter((p) => p.estado !== "CANCELADO").reduce((s, p) => s + toNumber(p.restaPagar), 0);
@@ -81,7 +86,10 @@ export function PedidosPage() {
           <button
             key={f.value}
             type="button"
-            onClick={() => setFiltro(f.value)}
+            onClick={() => {
+              setFiltro(f.value);
+              setPage(1);
+            }}
             aria-pressed={filtro === f.value}
             className={cn(
               "whitespace-nowrap rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
@@ -110,7 +118,7 @@ export function PedidosPage() {
         />
       ) : (
         <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
-          {filtered.map((p) => {
+          {pagina.map((p) => {
             const estado = estadoInfo(p.estado);
             const resta = toNumber(p.restaPagar);
             return (
@@ -142,29 +150,47 @@ export function PedidosPage() {
         </ul>
       )}
 
+      {!isLoading && !error && (
+        <Pagination
+          total={filtered.length}
+          page={step}
+          onPageChange={setPage}
+          noun={{ one: "pedido", many: "pedidos" }}
+        />
+      )}
+
       <PedidoFormModal
-        open={formOpen}
-        onClose={() => setFormOpen(false)}
+        open={formOpen || editing !== null}
+        onClose={() => {
+          setFormOpen(false);
+          setEditing(null);
+        }}
         onCreated={() => {
           setFormOpen(false);
-          mutate();
+          setEditing(null);
+          void mutate();
         }}
         clientes={clientes ?? []}
         productos={productos ?? []}
+        pedido={editing}
       />
 
       <PedidoDetailModal
         pedido={selected}
         cliente={selected ? clientesById.get(selected.clienteId) : undefined}
+        productos={productos ?? []}
         onClose={() => setSelectedId(null)}
-        onChanged={() => mutate()}
+        onChanged={async () => {
+          await mutate();
+        }}
         onDelete={(p) => setToDelete(p)}
+        onEdit={(p) => setEditing(p)}
       />
 
       <ConfirmDialog
         open={toDelete !== null}
         title="Eliminar pedido"
-        message="Se eliminará el pedido. Si tiene trabajos o tareas asociadas, puede que el servidor no lo permita."
+        message="Se borra el pedido y sus trabajos. No se puede deshacer."
         onConfirm={handleDelete}
         onCancel={() => setToDelete(null)}
         loading={deleting}

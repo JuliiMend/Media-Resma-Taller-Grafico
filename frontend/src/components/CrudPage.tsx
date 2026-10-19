@@ -1,8 +1,11 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import useSWR from "swr";
-import { Pencil, Plus, Search, Trash2 } from "lucide-react";
+import axios from "axios";
+import { AlertCircle, Archive, ArchiveRestore, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { api, fetcher, getErrorMessage } from "@/api/client";
 import { cn, toDateInput } from "@/lib/format";
+import { useRegistrarHistorial } from "@/lib/useHistorial";
+import { PAGE_SIZE, Pagination, clampPage, paginate } from "./Pagination";
 import {
   Button,
   ConfirmDialog,
@@ -29,6 +32,9 @@ export interface FieldDef {
   step?: string;
   defaultValue?: string | boolean;
   fullWidth?: boolean;
+  suggestions?: string[];
+  /** Para campos numéricos: envía null cuando el valor está vacío (limpia el dato). */
+  nullable?: boolean;
 }
 
 export interface ColumnDef<T> {
@@ -38,7 +44,7 @@ export interface ColumnDef<T> {
   primary?: boolean;
 }
 
-interface CrudPageProps<T extends { id: number }> {
+interface CrudPageProps<T extends { id: number; activo?: boolean }> {
   title: string;
   description: string;
   endpoint: string;
@@ -47,10 +53,16 @@ interface CrudPageProps<T extends { id: number }> {
   columns: ColumnDef<T>[];
   searchKeys: (keyof T)[];
   rowHighlight?: (item: T) => boolean;
-  summary?: (items: T[]) => ReactNode;
+  summary?: (items: T[], filtered: T[]) => ReactNode;
+  predicate?: (item: T) => boolean;
+  toolbar?: ReactNode;
+  /** Resumen en vivo dentro del formulario (ej. ganancia y margen de un producto). */
+  formSummary?: (values: FormValues) => ReactNode;
+  /** Cantidad de filas por página (por defecto 10). */
+  perPage?: number;
 }
 
-type FormValues = Record<string, string | boolean>;
+export type FormValues = Record<string, string | boolean>;
 
 function itemToForm<T>(item: T | null, fields: FieldDef[]): FormValues {
   const values: FormValues = {};
@@ -70,6 +82,7 @@ function formToPayload(values: FormValues, fields: FieldDef[]): Record<string, u
     if (f.type === "checkbox") payload[f.name] = Boolean(v);
     else if (f.type === "number") {
       if (v !== "") payload[f.name] = Number(v);
+      else if (f.nullable) payload[f.name] = null;
     } else if (f.type === "date") {
       if (v) payload[f.name] = new Date(`${v}T00:00:00.000Z`).toISOString();
     } else payload[f.name] = String(v ?? "").trim();
@@ -77,7 +90,7 @@ function formToPayload(values: FormValues, fields: FieldDef[]): Record<string, u
   return payload;
 }
 
-export function CrudPage<T extends { id: number }>({
+export function CrudPage<T extends { id: number; activo?: boolean }>({
   title,
   description,
   endpoint,
@@ -87,8 +100,13 @@ export function CrudPage<T extends { id: number }>({
   searchKeys,
   rowHighlight,
   summary,
+  predicate,
+  toolbar,
+  formSummary,
+  perPage = PAGE_SIZE,
 }: CrudPageProps<T>) {
   const { data, error, isLoading, mutate } = useSWR<T[]>(endpoint, fetcher);
+  const registrar = useRegistrarHistorial();
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<T | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -98,13 +116,23 @@ export function CrudPage<T extends { id: number }>({
   const [toDelete, setToDelete] = useState<T | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [toArchive, setToArchive] = useState<T | null>(null);
+  const [archiving, setArchiving] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [page, setPage] = useState(1);
 
   const items = data ?? [];
+  const archivable = items.some((item) => item.activo !== undefined);
+  const byPredicate = predicate ? items.filter(predicate) : items;
+  const visibles = archivable && !showArchived ? byPredicate.filter((item) => item.activo !== false) : byPredicate;
   const filtered = query
-    ? items.filter((item) =>
+    ? visibles.filter((item) =>
         searchKeys.some((k) => String(item[k] ?? "").toLowerCase().includes(query.toLowerCase())),
       )
-    : items;
+    : visibles;
+  const labelOf = (values: Record<string, unknown>) => String(values[fields[0].name] ?? "").trim();
+  const step = clampPage(page, filtered.length, perPage);
+  const filas = paginate(filtered, page, perPage);
 
   function openForm(item: T | null) {
     setEditing(item);
@@ -119,8 +147,15 @@ export function CrudPage<T extends { id: number }>({
     setFormError(null);
     try {
       const payload = formToPayload(values, fields);
-      if (editing) await api.patch(`${endpoint}/${editing.id}`, payload);
-      else await api.post(endpoint, payload);
+      const response = editing ? await api.patch(`${endpoint}/${editing.id}`, payload) : await api.post(endpoint, payload);
+      const savedId = editing ? editing.id : (response.data as { id?: number }).id;
+      const label = labelOf(payload);
+      void registrar(
+        editing ? "EDITAR" : "CREAR",
+        singular,
+        savedId,
+        `${editing ? "Editó" : "Creó"} ${singular}${label ? ` "${label}"` : ""}`,
+      );
       await mutate();
       setFormOpen(false);
     } catch (err) {
@@ -134,15 +169,45 @@ export function CrudPage<T extends { id: number }>({
     if (!toDelete) return;
     setDeleting(true);
     setActionError(null);
+    setToArchive(null);
     try {
       await api.delete(`${endpoint}/${toDelete.id}`);
+      const label = labelOf(toDelete as Record<string, unknown>);
+      void registrar("ELIMINAR", singular, toDelete.id, `Eliminó ${singular}${label ? ` "${label}"` : ""}`);
       await mutate();
       setToDelete(null);
     } catch (err) {
-      setActionError(getErrorMessage(err));
-      setToDelete(null);
+      const tieneRelaciones =
+        axios.isAxiosError(err) &&
+        err.response?.status === 409 &&
+        (err.response.data as { code?: string } | undefined)?.code === "TIENE_RELACIONES";
+      if (tieneRelaciones) {
+        setActionError(getErrorMessage(err));
+        setToArchive(toDelete);
+        setToDelete(null);
+      } else {
+        setActionError(getErrorMessage(err));
+        setToDelete(null);
+      }
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function handleArchive() {
+    if (!toArchive) return;
+    setArchiving(true);
+    setActionError(null);
+    try {
+      const label = labelOf(toArchive as Record<string, unknown>);
+      await api.patch(`${endpoint}/${toArchive.id}`, { activo: false });
+      void registrar("EDITAR", singular, toArchive.id, `Archivó ${singular}${label ? ` "${label}"` : ""}`);
+      await mutate();
+      setToArchive(null);
+    } catch (err) {
+      setActionError(getErrorMessage(err));
+    } finally {
+      setArchiving(false);
     }
   }
 
@@ -162,23 +227,72 @@ export function CrudPage<T extends { id: number }>({
         }
       />
 
-      {summary && data && <div className="mb-6">{summary(items)}</div>}
+      {summary && data && <div className="mb-6">{summary(items, filtered)}</div>}
 
-      <div className="relative mb-4 max-w-sm">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden="true" />
-        <Input
-          type="search"
-          placeholder="Buscar…"
-          aria-label={`Buscar ${title.toLowerCase()}`}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="pl-9"
-        />
+      <div className="mb-4 flex flex-wrap items-end gap-3">
+        <div className="relative w-full max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden="true" />
+          <Input
+            type="search"
+            placeholder="Buscar…"
+            aria-label={`Buscar ${title.toLowerCase()}`}
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPage(1);
+            }}
+            className="pl-9"
+          />
+        </div>
+        {archivable && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-pressed={showArchived}
+            onClick={() => {
+              setShowArchived((v) => !v);
+              setPage(1);
+            }}
+            className={cn(showArchived && "bg-ink/10 font-semibold")}
+          >
+            {showArchived ? (
+              <ArchiveRestore className="size-4" aria-hidden="true" />
+            ) : (
+              <Archive className="size-4" aria-hidden="true" />
+            )}
+            {showArchived ? "Ocultar archivados" : "Mostrar archivados"}
+          </Button>
+        )}
+        {toolbar}
       </div>
 
       {actionError && (
         <div className="mb-4">
-          <ErrorBanner message={actionError} />
+          {toArchive ? (
+            <div
+              role="alert"
+              className="flex items-start gap-3 rounded-lg border border-warning/20 bg-warning-soft p-4 text-sm text-warning"
+            >
+              <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              <p className="flex-1">{actionError}</p>
+              <Button type="button" size="sm" variant="secondary" loading={archiving} onClick={handleArchive}>
+                Archivar
+              </Button>
+              <button
+                type="button"
+                className="font-medium underline underline-offset-2"
+                onClick={() => {
+                  setToArchive(null);
+                  setActionError(null);
+                }}
+              >
+                Descartar
+              </button>
+            </div>
+          ) : (
+            <ErrorBanner message={actionError} />
+          )}
         </div>
       )}
 
@@ -188,8 +302,8 @@ export function CrudPage<T extends { id: number }>({
         <ErrorBanner message={getErrorMessage(error)} onRetry={() => mutate()} />
       ) : filtered.length === 0 ? (
         <EmptyState
-          title={query ? "Sin resultados" : `Todavía no hay ${title.toLowerCase()}`}
-          description={query ? "Probá con otra búsqueda." : `Creá el primer ${singular} para empezar.`}
+          title={items.length > 0 ? "Sin resultados" : `Todavía no hay ${title.toLowerCase()}`}
+          description={items.length > 0 ? "Probá con otra búsqueda o ajustá los filtros." : `Creá el primer ${singular} para empezar.`}
         />
       ) : (
         <>
@@ -208,7 +322,7 @@ export function CrudPage<T extends { id: number }>({
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {filtered.map((item) => (
+                {filas.map((item) => (
                   <tr key={item.id} className={cn("hover:bg-ink/5", rowHighlight?.(item) && "bg-danger-soft/60")}>
                     {columns.map((c) => (
                       <td key={c.label} className={cn("px-4 py-3", c.align === "right" && "text-right tabular-nums")}>
@@ -225,7 +339,7 @@ export function CrudPage<T extends { id: number }>({
           </div>
 
           <ul className="flex flex-col gap-3 md:hidden">
-            {filtered.map((item) => (
+            {filas.map((item) => (
               <li
                 key={item.id}
                 className={cn(
@@ -248,6 +362,14 @@ export function CrudPage<T extends { id: number }>({
               </li>
             ))}
           </ul>
+
+          <Pagination
+            total={filtered.length}
+            page={step}
+            pageSize={perPage}
+            onPageChange={setPage}
+            noun={{ one: singular, many: title.toLowerCase() }}
+          />
         </>
       )}
 
@@ -292,19 +414,30 @@ export function CrudPage<T extends { id: number }>({
                         ))}
                       </Select>
                     ) : (
-                      <Input
-                        {...common}
-                        type={f.type}
-                        step={f.type === "number" ? (f.step ?? "0.01") : undefined}
-                        min={f.type === "number" ? 0 : undefined}
-                        onChange={onChange}
-                      />
+                      <>
+                        <Input
+                          {...common}
+                          type={f.type}
+                          step={f.type === "number" ? (f.step ?? "0.01") : undefined}
+                          min={f.type === "number" ? 0 : undefined}
+                          list={f.suggestions ? `${id}-options` : undefined}
+                          onChange={onChange}
+                        />
+                        {f.suggestions && (
+                          <datalist id={`${id}-options`}>
+                            {f.suggestions.map((s) => (
+                              <option key={s} value={s} />
+                            ))}
+                          </datalist>
+                        )}
+                      </>
                     )}
                   </Field>
                 </div>
               );
             })}
           </div>
+          {formSummary?.(values)}
           {formError && <ErrorBanner message={formError} />}
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={() => setFormOpen(false)} disabled={saving}>

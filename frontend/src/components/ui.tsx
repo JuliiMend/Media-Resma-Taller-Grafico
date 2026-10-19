@@ -230,6 +230,9 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
   loading,
+  confirmLabel = "Eliminar",
+  cancelLabel = "Cancelar",
+  confirmVariant,
 }: {
   open: boolean;
   title: string;
@@ -237,16 +240,19 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
   loading?: boolean;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  confirmVariant?: "danger" | "primary";
 }) {
   return (
     <Modal open={open} onClose={onCancel} title={title}>
       <p className="text-sm text-muted text-pretty">{message}</p>
       <div className="mt-6 flex justify-end gap-2">
         <Button variant="secondary" onClick={onCancel} disabled={loading}>
-          Cancelar
+          {cancelLabel}
         </Button>
-        <Button variant="danger" onClick={onConfirm} loading={loading}>
-          Eliminar
+        <Button variant={confirmVariant ?? "danger"} onClick={onConfirm} loading={loading}>
+          {confirmLabel}
         </Button>
       </div>
     </Modal>

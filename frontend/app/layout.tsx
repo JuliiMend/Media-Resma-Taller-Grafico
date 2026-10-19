@@ -13,7 +13,13 @@ export const metadata: Metadata = {
   title: "Media Resma · Gestión",
   description:
     "Panel de gestión de Media Resma Taller Gráfico: pedidos, clientes, insumos, productos, gastos y tareas.",
-  icons: { icon: "/icon.svg" },
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: [{ url: "/apple-icon.png" }],
+  },
 };
 
 export const viewport: Viewport = {
@@ -22,7 +28,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className={montserrat.variable}>
+    <html lang="es" className={montserrat.variable} suppressHydrationWarning>
       <body>
         <div id="root">{children}</div>
       </body>

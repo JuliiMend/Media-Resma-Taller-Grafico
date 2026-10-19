@@ -7,6 +7,7 @@ export const crearInsumoSchema = z.object({
   stockMinimo: z.number().nonnegative().default(0),
   precioUnitario: z.number().nonnegative().default(0),
   proveedor: z.string().optional(),
+  activo: z.boolean().default(true),
 });
 
 export const actualizarInsumoSchema = crearInsumoSchema.partial();

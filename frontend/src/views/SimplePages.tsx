@@ -1,8 +1,9 @@
 import { AlertTriangle } from "lucide-react";
 import { CrudPage } from "@/components/CrudPage";
 import { Badge } from "@/components/ui";
-import { formatDate, formatMoney, toNumber } from "@/lib/format";
-import type { Cliente, Gasto, Insumo, Producto } from "@/types";
+import { formatMoney, toNumber } from "@/lib/format";
+import { UNIDADES_PRODUCTO } from "@/lib/unidades";
+import type { Cliente, Insumo, Producto } from "@/types";
 
 export function ClientesPage() {
   return (
@@ -15,6 +16,7 @@ export function ClientesPage() {
       fields={[
         { name: "nombre", label: "Nombre", type: "text", required: true, fullWidth: true },
         { name: "telefono", label: "Teléfono", type: "text", placeholder: "11 5555-5555", fullWidth: true },
+        { name: "userContacto", label: "Usuario de contacto", type: "text", fullWidth: true },
         { name: "notas", label: "Notas", type: "textarea" },
       ]}
       columns={[
@@ -76,6 +78,12 @@ export function InsumosPage() {
   );
 }
 
+const margenFormatter = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 });
+
+function costoDe(p: Producto): number | null {
+  return p.costo === null || p.costo === undefined ? null : toNumber(p.costo);
+}
+
 export function ProductosPage() {
   return (
     <CrudPage<Producto>
@@ -98,45 +106,76 @@ export function ProductosPage() {
           ],
         },
         { name: "precioVenta", label: "Precio de venta", type: "number", required: true },
+        { name: "costo", label: "Costo", type: "number", nullable: true },
+        {
+          name: "unidad",
+          label: "Unidad",
+          type: "select",
+          required: true,
+          defaultValue: "u",
+          options: UNIDADES_PRODUCTO.map((u) => ({ value: u, label: u })),
+        },
         { name: "descripcion", label: "Descripción", type: "textarea" },
         { name: "activo", label: "Producto activo", type: "checkbox", defaultValue: true },
       ]}
+      formSummary={(values) => {
+        const precio = values.precioVenta === "" ? null : Number(values.precioVenta);
+        const costo = values.costo === "" ? null : Number(values.costo);
+        const disponible = precio !== null && costo !== null && Number.isFinite(precio) && Number.isFinite(costo);
+        const ganancia = disponible ? (precio as number) - (costo as number) : null;
+        const margen = disponible && (precio as number) > 0 ? ((ganancia as number) / (precio as number)) * 100 : null;
+        return (
+          <dl className="grid grid-cols-3 gap-4 rounded-lg bg-background p-4 text-sm">
+            <div>
+              <dt className="text-xs text-muted">Precio de venta</dt>
+              <dd className="font-semibold tabular-nums">{precio === null ? "—" : formatMoney(precio)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted">Ganancia</dt>
+              <dd className={ganancia !== null && ganancia < 0 ? "font-semibold tabular-nums text-danger" : "font-semibold tabular-nums text-success"}>
+                {ganancia === null ? "—" : formatMoney(ganancia)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted">Margen</dt>
+              <dd className="font-semibold tabular-nums">{margen === null ? "—" : `${margenFormatter.format(margen)} %`}</dd>
+            </div>
+          </dl>
+        );
+      }}
       columns={[
         { label: "Nombre", render: (p) => p.nombre, primary: true },
         { label: "Tipo", render: (p) => <Badge tone={p.tipo === "PROPIO" ? "primary" : "neutral"}>{p.tipo === "PROPIO" ? "Propio" : "Tercerizado"}</Badge> },
+        {
+          label: "Costo",
+          align: "right",
+          render: (p) => {
+            const costo = costoDe(p);
+            return costo === null ? <span className="text-muted">Sin costo</span> : formatMoney(costo);
+          },
+        },
         { label: "Precio", align: "right", render: (p) => formatMoney(p.precioVenta) },
-        { label: "Estado", render: (p) => <Badge tone={p.activo ? "success" : "neutral"}>{p.activo ? "Activo" : "Inactivo"}</Badge> },
+        {
+          label: "Ganancia",
+          align: "right",
+          render: (p) => {
+            const costo = costoDe(p);
+            return costo === null ? "—" : formatMoney(toNumber(p.precioVenta) - costo);
+          },
+        },
+        {
+          label: "Margen",
+          align: "right",
+          render: (p) => {
+            const costo = costoDe(p);
+            const precio = toNumber(p.precioVenta);
+            if (costo === null || precio <= 0) return "—";
+            return `${margenFormatter.format(((precio - costo) / precio) * 100)} %`;
+          },
+        },
+        { label: "Estado", render: (p) => <Badge tone={p.activo ? "success" : "neutral"}>{p.activo ? "Activo" : "Archivado"}</Badge> },
       ]}
     />
   );
 }
 
-export function GastosPage() {
-  return (
-    <CrudPage<Gasto>
-      title="Gastos"
-      description="Registro de gastos del taller."
-      endpoint="/gastos"
-      singular="gasto"
-      searchKeys={["concepto", "medioPago"]}
-      summary={(items) => (
-        <div className="inline-flex flex-col rounded-xl border border-line bg-surface px-5 py-4">
-          <span className="text-xs text-muted">Total registrado</span>
-          <span className="text-xl font-semibold tabular-nums">{formatMoney(items.reduce((s, g) => s + toNumber(g.monto), 0))}</span>
-        </div>
-      )}
-      fields={[
-        { name: "concepto", label: "Concepto", type: "text", required: true, fullWidth: true },
-        { name: "monto", label: "Monto", type: "number", required: true },
-        { name: "fecha", label: "Fecha", type: "date", defaultValue: new Date().toISOString().slice(0, 10) },
-        { name: "medioPago", label: "Medio de pago", type: "text", placeholder: "Efectivo, transferencia…", fullWidth: true },
-      ]}
-      columns={[
-        { label: "Concepto", render: (g) => g.concepto, primary: true },
-        { label: "Fecha", render: (g) => formatDate(g.fecha) },
-        { label: "Medio de pago", render: (g) => g.medioPago || "—" },
-        { label: "Monto", align: "right", render: (g) => formatMoney(g.monto) },
-      ]}
-    />
-  );
-}
