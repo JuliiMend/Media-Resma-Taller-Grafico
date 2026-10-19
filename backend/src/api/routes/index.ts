@@ -15,6 +15,7 @@ import { tareaRouter } from "./tarea.routes";
 import { gastoRouter } from "./gasto.routes";
 import { historialRouter } from "./historial.routes";
 import { alertaRouter } from "./alerta.routes";
+import { reporteRouter } from "./reporte.routes";
 
 export const apiRouter = Router();
 
@@ -33,3 +34,4 @@ apiRouter.use("/tareas", requireAuth, tareaRouter);
 apiRouter.use("/gastos", requireAuth, gastoRouter);
 apiRouter.use("/historial", requireAuth, historialRouter);
 apiRouter.use("/alertas", requireAuth, alertaRouter);
+apiRouter.use("/reportes", requireAuth, reporteRouter);

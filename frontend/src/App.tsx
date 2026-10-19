@@ -12,6 +12,7 @@ import { ComprasPage } from "@/views/ComprasPage";
 import { GastosPage } from "@/views/GastosPage";
 import { HistorialPage } from "@/views/HistorialPage";
 import { PerfilPage } from "@/views/PerfilPage";
+import { ReportesPage } from "@/views/ReportesPage";
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
                 <Route path="/clientes" element={<ClientesPage />} />
                 <Route path="/tareas" element={<TareasPage />} />
                 <Route path="/productos" element={<ProductosPage />} />
+                <Route path="/reportes" element={<ReportesPage />} />
                 <Route path="/insumos" element={<InsumosPage />} />
                 <Route path="/gastos" element={<GastosPage />} />
                 <Route path="/compras" element={<ComprasPage />} />

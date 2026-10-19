@@ -1,15 +1,25 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../config/db";
 import { CrearPedidoInput, ActualizarPedidoInput } from "@/schemas/pedido.schema";
-const prisma = new PrismaClient();
 
 export const pedidoRepository = {
-    findAll: () => prisma.pedido.findMany({ orderBy: { fecha: "desc" } }),
+    findAll: () =>
+        prisma.pedido.findMany({
+            orderBy: { fecha: "desc" },
+            include: { cliente: true, trabajos: true },
+        }),
 
-    findById: (id: number) => prisma.pedido.findUnique({ where: { id } }),
+    findById: (id: number) =>
+        prisma.pedido.findUnique({
+            where: { id },
+            include: { cliente: true, trabajos: true },
+        }),
 
     findConSaldo: () =>
         prisma.pedido.findMany({
-            where: { restaPagar: { gt: 0 } },
+            where: {
+                restaPagar: { gt: 0 },
+                estado: { not: "CANCELADO" },
+            },
             orderBy: { fecha: "asc" },
             include: { cliente: true },
         }),
@@ -22,13 +32,14 @@ export const pedidoRepository = {
                     lte: hasta,
                 },
                 estado: {
-                    not: "ENTREGADO"
-                }
+                    notIn: ["ENTREGADO", "CANCELADO"],
+                },
             },
             include: { cliente: true },
         }),
 
-    create: (data: CrearPedidoInput) => prisma.pedido.create({ data }),
+    create: (data: Omit<CrearPedidoInput, "trabajos">) =>
+        prisma.pedido.create({ data }),
 
     update: (id: number, data: ActualizarPedidoInput) =>
         prisma.pedido.update({ where: { id }, data }),

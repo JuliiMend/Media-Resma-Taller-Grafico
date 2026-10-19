@@ -10,7 +10,8 @@ import type { Insumo, Pedido, Tarea } from "@/types";
 import { ESTADOS_PEDIDO } from "./pedidos/estados";
 
 const TAREA_DONE = "COMPLETADA";
-const ESTADOS_ACTIVOS = ESTADOS_PEDIDO.filter((e) => e.value !== "ENTREGADO" && e.value !== "CANCELADO");
+const ESTADOS_ACTIVOS = ESTADOS_PEDIDO.filter((e) => e.value === "PENDIENTE" || e.value === "EN_PROCESO" || e.value === "LISTO");
+const esActivo = (p: Pedido) => ESTADOS_ACTIVOS.some((e) => e.value === p.estado);
 
 function SeeAll({ to, label }: { to: string; label: string }) {
   return (
@@ -33,7 +34,7 @@ function CardBody({ loading, error, onRetry, children }: { loading: boolean; err
 function PedidosCard() {
   const { data, error, isLoading, mutate } = useSWR<Pedido[]>("/pedidos", fetcher);
   const pedidos = data ?? [];
-  const activos = pedidos.filter((p) => p.estado !== "ENTREGADO" && p.estado !== "CANCELADO");
+  const activos = pedidos.filter(esActivo);
   const saldo = pedidos.filter((p) => p.estado !== "CANCELADO").reduce((s, p) => s + toNumber(p.restaPagar), 0);
 
   return (
@@ -71,6 +72,7 @@ function PedidosCard() {
 function InsumosCriticosCard() {
   const { data, error, isLoading, mutate } = useSWR<Insumo[]>("/insumos/stock-bajo", fetcher);
   const insumos = Array.isArray(data) ? data : [];
+  const visibles = insumos.slice(0, 5);
 
   return (
     <Card
@@ -82,30 +84,35 @@ function InsumosCriticosCard() {
         {insumos.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted">Todo el stock está por encima del mínimo.</p>
         ) : (
-          <ul className="flex flex-col gap-4">
-            {insumos.map((i) => {
-              const stock = toNumber(i.stockActual);
-              const minimo = toNumber(i.stockMinimo);
-              const ratio = minimo > 0 ? Math.min(Math.max(stock / minimo, 0), 1) : 0;
-              const critical = ratio <= 0.5;
-              return (
-                <li key={i.id}>
-                  <div className="mb-1.5 flex items-baseline justify-between gap-3">
-                    <span className="min-w-0 truncate text-sm font-semibold">{i.nombre}</span>
-                    <span className="shrink-0 text-xs text-muted tabular-nums">
-                      {stock} / {minimo} {i.unidad}
-                    </span>
-                  </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-ink/10" role="presentation">
-                    <div
-                      className={cn("h-full rounded-full", critical ? "bg-danger" : "bg-warning")}
-                      style={{ width: `${Math.max(ratio * 100, 4)}%` }}
-                    />
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+          <>
+            <ul className="flex flex-col gap-4">
+              {visibles.map((i) => {
+                const stock = toNumber(i.stockActual);
+                const minimo = toNumber(i.stockMinimo);
+                const ratio = minimo > 0 ? Math.min(Math.max(stock / minimo, 0), 1) : 0;
+                const critical = ratio <= 0.5;
+                return (
+                  <li key={i.id}>
+                    <div className="mb-1.5 flex items-baseline justify-between gap-3">
+                      <span className="min-w-0 truncate text-sm font-semibold">{i.nombre}</span>
+                      <span className="shrink-0 text-xs text-muted tabular-nums">
+                        {stock} / {minimo} {i.unidad}
+                      </span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-ink/10" role="presentation">
+                      <div
+                        className={cn("h-full rounded-full", critical ? "bg-danger" : "bg-warning")}
+                        style={{ width: `${Math.max(ratio * 100, 4)}%` }}
+                      />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+            {insumos.length > visibles.length && (
+              <p className="mt-3 text-xs text-muted">y {insumos.length - visibles.length} más con stock bajo</p>
+            )}
+          </>
         )}
       </CardBody>
     </Card>

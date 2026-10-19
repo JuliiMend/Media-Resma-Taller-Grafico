@@ -3,10 +3,11 @@ import useSWR from "swr";
 import { RefreshCw, Search } from "lucide-react";
 import { fetcher, getErrorMessage } from "@/api/client";
 import { Badge, Button, EmptyState, ErrorBanner, Field, Input, LoadingState, PageHeader, Select } from "@/components/ui";
+import { Pagination, clampPage, paginate } from "@/components/Pagination";
 import { formatDateTime } from "@/lib/format";
 import type { HistorialEntry } from "@/types";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 15;
 
 const accionTone = (accion: string) => {
   if (accion === "CREAR" || accion === "COMPLETAR") return "success" as const;
@@ -22,7 +23,7 @@ export function HistorialPage() {
   const [query, setQuery] = useState("");
   const [entidad, setEntidad] = useState("");
   const [accion, setAccion] = useState("");
-  const [visible, setVisible] = useState(PAGE_SIZE);
+  const [page, setPage] = useState(1);
 
   const entries = useMemo(() => [...(data ?? [])].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime() || b.id - a.id), [data]);
   const entidades = useMemo(() => Array.from(new Set(entries.map((e) => e.entidad))).sort(), [entries]);
@@ -37,7 +38,8 @@ export function HistorialPage() {
     }
     return true;
   });
-  const shown = filtered.slice(0, visible);
+  const shown = paginate(filtered, page, PAGE_SIZE);
+  const step = clampPage(page, filtered.length, PAGE_SIZE);
 
   return (
     <div>
@@ -62,13 +64,13 @@ export function HistorialPage() {
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
-              setVisible(PAGE_SIZE);
+              setPage(1);
             }}
             className="pl-9"
           />
         </div>
         <Field label="Entidad" htmlFor="h-entidad">
-          <Select id="h-entidad" value={entidad} onChange={(e) => { setEntidad(e.target.value); setVisible(PAGE_SIZE); }} className="w-44">
+          <Select id="h-entidad" value={entidad} onChange={(e) => { setEntidad(e.target.value); setPage(1); }} className="w-44">
             <option value="">Todas</option>
             {entidades.map((e) => (
               <option key={e} value={e}>{label(e)}</option>
@@ -76,7 +78,7 @@ export function HistorialPage() {
           </Select>
         </Field>
         <Field label="Acción" htmlFor="h-accion">
-          <Select id="h-accion" value={accion} onChange={(e) => { setAccion(e.target.value); setVisible(PAGE_SIZE); }} className="w-44">
+          <Select id="h-accion" value={accion} onChange={(e) => { setAccion(e.target.value); setPage(1); }} className="w-44">
             <option value="">Todas</option>
             {acciones.map((a) => (
               <option key={a} value={a}>{label(a)}</option>
@@ -136,16 +138,13 @@ export function HistorialPage() {
             ))}
           </ul>
 
-          <div className="mt-4 flex items-center justify-between text-sm text-muted">
-            <span>
-              Mostrando {shown.length} de {filtered.length}
-            </span>
-            {shown.length < filtered.length && (
-              <Button variant="secondary" onClick={() => setVisible((v) => v + PAGE_SIZE)}>
-                Mostrar más
-              </Button>
-            )}
-          </div>
+          <Pagination
+            total={filtered.length}
+            page={step}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+            noun={{ one: "acción", many: "acciones" }}
+          />
         </>
       )}
     </div>

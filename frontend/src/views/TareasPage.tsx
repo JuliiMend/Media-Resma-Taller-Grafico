@@ -19,6 +19,7 @@ import {
   Select,
   Textarea,
 } from "@/components/ui";
+import { Pagination, paginate } from "@/components/Pagination";
 import type { Pedido, Tarea } from "@/types";
 
 const DONE = "COMPLETADA";
@@ -39,6 +40,8 @@ export function TareasPage() {
   const [deleting, setDeleting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingIds, setPendingIds] = useState<Set<number>>(new Set());
+  const [pagePendientes, setPagePendientes] = useState(1);
+  const [pageCompletadas, setPageCompletadas] = useState(1);
 
   const tareas = data ?? [];
   const pendientes = tareas.filter((t) => t.estado !== DONE);
@@ -200,14 +203,32 @@ export function TareasPage() {
             <h2 id="pendientes-title" className="mb-3 text-sm font-semibold text-muted">
               Pendientes ({pendientes.length})
             </h2>
-            {pendientes.length ? renderList(pendientes) : <p className="text-sm text-muted">No hay tareas pendientes.</p>}
+            {pendientes.length ? (
+              <>
+                {renderList(paginate(pendientes, pagePendientes))}
+                <Pagination
+                  total={pendientes.length}
+                  page={pagePendientes}
+                  onPageChange={setPagePendientes}
+                  noun={{ one: "tarea pendiente", many: "tareas pendientes" }}
+                />
+              </>
+            ) : (
+              <p className="text-sm text-muted">No hay tareas pendientes.</p>
+            )}
           </section>
           {completadas.length > 0 && (
             <section aria-labelledby="completadas-title">
               <h2 id="completadas-title" className="mb-3 text-sm font-semibold text-muted">
                 Completadas ({completadas.length})
               </h2>
-              {renderList(completadas)}
+              {renderList(paginate(completadas, pageCompletadas))}
+              <Pagination
+                total={completadas.length}
+                page={pageCompletadas}
+                onPageChange={setPageCompletadas}
+                noun={{ one: "tarea completada", many: "tareas completadas" }}
+              />
             </section>
           )}
         </div>

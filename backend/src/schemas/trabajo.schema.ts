@@ -6,8 +6,11 @@ export const crearTrabajoSchema = z.object({
   descripcion: z.string().min(1, "La descripción es obligatoria"),
   cantidad: z.number().positive().default(1),
   valorUnitario: z.number().nonnegative(),
+  costoUnitario: z.number().nonnegative().nullable().optional(),
   estadoProducto: z.string().optional(),
 });
+
+export const crearTrabajoSinPedidoSchema = crearTrabajoSchema.omit({ pedidoId: true });
 
 export const actualizarTrabajoSchema = crearTrabajoSchema.partial();
 export type CrearTrabajoInput = z.infer<typeof crearTrabajoSchema>;

@@ -15,6 +15,7 @@ import {
   Select,
 } from "@/components/ui";
 import { formatDate, formatMoney, toNumber } from "@/lib/format";
+import { Pagination, clampPage, paginate } from "@/components/Pagination";
 import { MEDIOS_PAGO_SUGERIDOS } from "@/lib/medios-pago";
 import { useRegistrarHistorial } from "@/lib/useHistorial";
 import type { Compra, Insumo } from "@/types";
@@ -48,6 +49,7 @@ export function ComprasPage() {
   const [toDelete, setToDelete] = useState<Compra | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   const insumoById = useMemo(() => new Map((insumos.data ?? []).map((i) => [i.id, i])), [insumos.data]);
   const lista = useMemo(
@@ -67,6 +69,8 @@ export function ComprasPage() {
   const stockNuevo = selected && cantidadNum > 0 ? round3(toNumber(selected.stockActual) + cantidadNum) : null;
   const unitario = cantidadNum > 0 && precioNum >= 0 && form.precio !== "" ? round2(precioNum / cantidadNum) : null;
   const totalFiltrado = filtered.reduce((s, c) => s + toNumber(c.precio), 0);
+  const step = clampPage(page, filtered.length);
+  const pagina = paginate(filtered, page);
 
   function openForm() {
     setForm(emptyForm());
@@ -179,7 +183,7 @@ export function ComprasPage() {
 
       <div className="relative mb-4 max-w-sm">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden="true" />
-        <Input type="search" placeholder="Buscar por insumo o medio de pago…" aria-label="Buscar compras" value={query} onChange={(e) => setQuery(e.target.value)} className="pl-9" />
+        <Input type="search" placeholder="Buscar por insumo o medio de pago…" aria-label="Buscar compras" value={query} onChange={(e) => { setQuery(e.target.value); setPage(1); }} className="pl-9" />
       </div>
 
       {loading ? (
@@ -213,7 +217,7 @@ export function ComprasPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {filtered.map((c) => {
+                {pagina.map((c) => {
                   const insumo = insumoById.get(c.insumoId);
                   const cant = toNumber(c.cantidad);
                   return (
@@ -237,7 +241,7 @@ export function ComprasPage() {
           </div>
 
           <ul className="flex flex-col gap-3 md:hidden">
-            {filtered.map((c) => {
+            {pagina.map((c) => {
               const insumo = insumoById.get(c.insumoId);
               return (
                 <li key={c.id} className="rounded-xl border border-line bg-surface p-4">
@@ -266,6 +270,13 @@ export function ComprasPage() {
               );
             })}
           </ul>
+
+          <Pagination
+            total={filtered.length}
+            page={step}
+            onPageChange={setPage}
+            noun={{ one: "compra", many: "compras" }}
+          />
         </>
       )}
 

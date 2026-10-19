@@ -5,6 +5,8 @@ export const crearProductoSchema = z.object({
   tipo: z.string().min(1, "El tipo es obligatorio"),
   descripcion: z.string().optional(),
   precioVenta: z.number().nonnegative().optional(),
+  costo: z.number().nonnegative().nullable().optional(),
+  unidad: z.string().min(1).default("u"),
   activo: z.boolean().default(true),
 });
 

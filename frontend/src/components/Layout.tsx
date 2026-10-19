@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
+  ChartColumn,
   ClipboardList,
   History,
   LayoutDashboard,
@@ -26,6 +27,7 @@ const NAV = [
   { to: "/insumos", label: "Insumos", icon: Package },
   { to: "/clientes", label: "Clientes", icon: Users },
   { to: "/productos", label: "Productos", icon: ShoppingBag },
+  { to: "/reportes", label: "Reportes", icon: ChartColumn },
   { to: "/tareas", label: "Tareas", icon: SquareCheck },
   { to: "/compras", label: "Compras", icon: ShoppingCart },
   { to: "/gastos", label: "Gastos", icon: Receipt },

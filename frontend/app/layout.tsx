@@ -13,7 +13,13 @@ export const metadata: Metadata = {
   title: "Media Resma · Gestión",
   description:
     "Panel de gestión de Media Resma Taller Gráfico: pedidos, clientes, insumos, productos, gastos y tareas.",
-  icons: { icon: "/icon.svg" },
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: [{ url: "/apple-icon.png" }],
+  },
 };
 
 export const viewport: Viewport = {

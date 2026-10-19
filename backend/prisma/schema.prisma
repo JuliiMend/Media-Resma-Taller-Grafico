@@ -28,6 +28,7 @@ model Cliente {
   userContacto String?
   telefono     String?
   notas        String?
+  activo       Boolean  @default(true)
   creadoEn     DateTime @default(now())
 
   pedidos Pedido[]
@@ -54,6 +55,8 @@ model Producto {
   tipo        String
   descripcion String?
   precioVenta Decimal?
+  costo       Decimal?
+  unidad      String   @default("u")
   activo      Boolean  @default(true)
 
   receta   ProductoInsumo[]
