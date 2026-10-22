@@ -36,6 +36,10 @@ function PedidosCard() {
   const pedidos = data ?? [];
   const activos = pedidos.filter(esActivo);
   const saldo = pedidos.filter((p) => p.estado !== "CANCELADO").reduce((s, p) => s + toNumber(p.restaPagar), 0);
+  const deudas = pedidos.filter(
+    (p) => (p.estado === "LISTO" || p.estado === "ENTREGADO") && toNumber(p.restaPagar) > 0,
+  );
+  const saldoDeudas = deudas.reduce((s, p) => s + toNumber(p.restaPagar), 0);
 
   return (
     <Card title="Pedidos" icon={<ClipboardList className="size-4 text-muted" aria-hidden="true" />} action={<SeeAll to="/pedidos" label="Ver pedidos" />}>
@@ -45,6 +49,13 @@ function PedidosCard() {
         <p className="mt-2 text-sm text-muted">
           Saldo por cobrar <span className="font-semibold text-ink tabular-nums">{formatMoney(saldo)}</span>
         </p>
+        <Link
+          to="/pedidos?vista=deudas"
+          className="mt-1 inline-flex text-sm font-semibold text-danger underline-offset-2 hover:underline"
+        >
+          Listos / entregados sin cobrar: {formatMoney(saldoDeudas)} ({deudas.length}{" "}
+          {deudas.length === 1 ? "pedido" : "pedidos"})
+        </Link>
 
         {activos.length > 0 && (
           <ul className="mt-5 flex flex-col gap-3 border-t border-line pt-4">

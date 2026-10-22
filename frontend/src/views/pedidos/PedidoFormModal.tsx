@@ -5,7 +5,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { Button, ErrorBanner, Field, Input, Modal, Select, Textarea } from "@/components/ui";
 import { SearchSelect } from "@/components/SearchSelect";
 import { ClienteQuickModal, ProductoQuickModal } from "@/components/QuickCreate";
-import { formatMoney, toDateInput, toNumber } from "@/lib/format";
+import { cn, formatMoney, toDateInput, toNumber } from "@/lib/format";
 import type { Cliente, Pedido, Producto } from "@/types";
 import { ESTADOS_PEDIDO } from "./estados";
 
@@ -225,7 +225,7 @@ export function PedidoFormModal({
                 </div>
                 <div className="sm:col-span-1">
                   <Field label="Cant." htmlFor={`l-cant-${l.key}`}>
-                    <Input id={`l-cant-${l.key}`} type="number" min={0} step="1" value={l.cantidad} onChange={(e) => updateLinea(l.key, { cantidad: e.target.value })} />
+                    <Input id={`l-cant-${l.key}`} type="number" min={0} step="any" inputMode="decimal" value={l.cantidad} onChange={(e) => updateLinea(l.key, { cantidad: e.target.value })} />
                   </Field>
                 </div>
                 <div className="sm:col-span-2">
@@ -282,7 +282,7 @@ export function PedidoFormModal({
             </div>
             <div>
               <dt className="text-xs text-muted">Resta pagar</dt>
-              <dd className="font-semibold tabular-nums text-primary">{formatMoney(resta)}</dd>
+              <dd className={cn("font-semibold tabular-nums", resta > 0 ? "text-danger" : "text-success")}>{formatMoney(resta)}</dd>
             </div>
           </dl>
         )}

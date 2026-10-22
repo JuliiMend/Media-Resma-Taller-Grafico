@@ -1,11 +1,12 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import useSWR from "swr";
+import { Link } from "react-router-dom";
 import { RefreshCw, Search } from "lucide-react";
 import { fetcher, getErrorMessage } from "@/api/client";
 import { Badge, Button, EmptyState, ErrorBanner, Field, Input, LoadingState, PageHeader, Select } from "@/components/ui";
 import { Pagination, clampPage, paginate } from "@/components/Pagination";
-import { formatDateTime } from "@/lib/format";
-import type { HistorialEntry } from "@/types";
+import { formatDateTime, toDateInput } from "@/lib/format";
+import type { HistorialEntry, Usuario } from "@/types";
 
 const PAGE_SIZE = 15;
 
@@ -18,11 +19,35 @@ const accionTone = (accion: string) => {
 
 const label = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase().replace(/_/g, " ");
 
+function Detalle({ value }: { value: string }): ReactNode {
+  return (
+    <>
+      {value.split(/(Pedido\s+#\d+)/gi).map((parte, i) => {
+        const match = /^Pedido\s+#(\d+)$/i.exec(parte);
+        if (!match) return <span key={i}>{parte}</span>;
+        return (
+          <Link
+            key={i}
+            to={`/pedidos?pedido=${match[1]}`}
+            className="font-medium text-primary underline-offset-2 hover:underline"
+          >
+            {parte}
+          </Link>
+        );
+      })}
+    </>
+  );
+}
+
 export function HistorialPage() {
   const { data, error, isLoading, isValidating, mutate } = useSWR<HistorialEntry[]>("/historial", fetcher);
+  const { data: usuarios } = useSWR<Usuario[]>("/usuarios", fetcher);
   const [query, setQuery] = useState("");
   const [entidad, setEntidad] = useState("");
   const [accion, setAccion] = useState("");
+  const [usuarioId, setUsuarioId] = useState("");
+  const [desde, setDesde] = useState("");
+  const [hasta, setHasta] = useState("");
   const [page, setPage] = useState(1);
 
   const entries = useMemo(() => [...(data ?? [])].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime() || b.id - a.id), [data]);
@@ -32,6 +57,10 @@ export function HistorialPage() {
   const filtered = entries.filter((e) => {
     if (entidad && e.entidad !== entidad) return false;
     if (accion && e.accion !== accion) return false;
+    if (usuarioId && String(e.usuarioId) !== usuarioId) return false;
+    const dia = toDateInput(e.fecha);
+    if (desde && dia < desde) return false;
+    if (hasta && dia > hasta) return false;
     if (query) {
       const q = query.toLowerCase();
       return e.detalle.toLowerCase().includes(q) || (e.usuario?.nombre ?? "").toLowerCase().includes(q);
@@ -85,6 +114,20 @@ export function HistorialPage() {
             ))}
           </Select>
         </Field>
+        <Field label="Usuario" htmlFor="h-usuario">
+          <Select id="h-usuario" value={usuarioId} onChange={(e) => { setUsuarioId(e.target.value); setPage(1); }} className="w-44">
+            <option value="">Todos</option>
+            {(usuarios ?? []).map((u) => (
+              <option key={u.id} value={u.id}>{u.nombre}</option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Desde" htmlFor="h-desde">
+          <Input id="h-desde" type="date" value={desde} max={hasta || undefined} onChange={(e) => { setDesde(e.target.value); setPage(1); }} className="w-40" />
+        </Field>
+        <Field label="Hasta" htmlFor="h-hasta">
+          <Input id="h-hasta" type="date" value={hasta} min={desde || undefined} onChange={(e) => { setHasta(e.target.value); setPage(1); }} className="w-40" />
+        </Field>
       </div>
 
       {isLoading ? (
@@ -115,8 +158,17 @@ export function HistorialPage() {
                     <td className="whitespace-nowrap px-4 py-3 text-muted tabular-nums">{formatDateTime(e.fecha)}</td>
                     <td className="px-4 py-3">{e.usuario?.nombre ?? `Usuario #${e.usuarioId}`}</td>
                     <td className="px-4 py-3"><Badge tone={accionTone(e.accion)}>{label(e.accion)}</Badge></td>
-                    <td className="whitespace-nowrap px-4 py-3">{label(e.entidad)} <span className="text-muted">#{e.entidadId}</span></td>
-                    <td className="px-4 py-3 text-pretty">{e.detalle}</td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      {label(e.entidad)}{" "}
+                      {e.entidad === "pedido" ? (
+                        <Link to={`/pedidos?pedido=${e.entidadId}`} className="font-medium text-primary underline-offset-2 hover:underline">
+                          #{e.entidadId}
+                        </Link>
+                      ) : (
+                        <span className="text-muted">#{e.entidadId}</span>
+                      )}
+                    </td>
+                    <td className="whitespace-pre-line px-4 py-3 text-pretty"><Detalle value={e.detalle} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -130,9 +182,17 @@ export function HistorialPage() {
                   <Badge tone={accionTone(e.accion)}>{label(e.accion)}</Badge>
                   <span className="text-xs text-muted">{formatDateTime(e.fecha)}</span>
                 </div>
-                <p className="mt-2 text-sm text-pretty">{e.detalle}</p>
+                <p className="mt-2 whitespace-pre-line text-sm text-pretty"><Detalle value={e.detalle} /></p>
                 <p className="mt-2 text-xs text-muted">
-                  {label(e.entidad)} #{e.entidadId} · {e.usuario?.nombre ?? `Usuario #${e.usuarioId}`}
+                  {label(e.entidad)}{" "}
+                  {e.entidad === "pedido" ? (
+                    <Link to={`/pedidos?pedido=${e.entidadId}`} className="font-medium text-primary underline-offset-2 hover:underline">
+                      #{e.entidadId}
+                    </Link>
+                  ) : (
+                    <>#{e.entidadId}</>
+                  )}{" "}
+                  · {e.usuario?.nombre ?? `Usuario #${e.usuarioId}`}
                 </p>
               </li>
             ))}

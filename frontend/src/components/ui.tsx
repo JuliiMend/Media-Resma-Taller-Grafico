@@ -199,6 +199,7 @@ export function Modal({
       aria-labelledby={titleId}
       onClose={onClose}
       onClick={(e) => {
+        e.stopPropagation();
         if (e.target === e.currentTarget) onClose();
       }}
       className={cn(
@@ -229,9 +230,11 @@ export function ConfirmDialog({
   message,
   onConfirm,
   onCancel,
+  onSecondary,
   loading,
   confirmLabel = "Eliminar",
   cancelLabel = "Cancelar",
+  secondaryLabel,
   confirmVariant,
 }: {
   open: boolean;
@@ -239,18 +242,25 @@ export function ConfirmDialog({
   message: string;
   onConfirm: () => void;
   onCancel: () => void;
+  onSecondary?: () => void;
   loading?: boolean;
   confirmLabel?: string;
   cancelLabel?: string;
+  secondaryLabel?: string;
   confirmVariant?: "danger" | "primary";
 }) {
   return (
     <Modal open={open} onClose={onCancel} title={title}>
       <p className="text-sm text-muted text-pretty">{message}</p>
-      <div className="mt-6 flex justify-end gap-2">
+      <div className="mt-6 flex flex-wrap justify-end gap-2">
         <Button variant="secondary" onClick={onCancel} disabled={loading}>
           {cancelLabel}
         </Button>
+        {onSecondary && secondaryLabel && (
+          <Button variant="secondary" onClick={onSecondary} disabled={loading}>
+            {secondaryLabel}
+          </Button>
+        )}
         <Button variant={confirmVariant ?? "danger"} onClick={onConfirm} loading={loading}>
           {confirmLabel}
         </Button>

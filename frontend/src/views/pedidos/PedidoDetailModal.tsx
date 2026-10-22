@@ -1,11 +1,21 @@
 import { useState, type FormEvent } from "react";
+import useSWR from "swr";
 import { Pencil, Plus, Trash2 } from "lucide-react";
-import { api, getErrorMessage } from "@/api/client";
+import { api, fetcher, getErrorMessage } from "@/api/client";
 import { Badge, Button, ConfirmDialog, ErrorBanner, Field, Input, Modal, Select } from "@/components/ui";
-import { cn, formatDate, formatMoney, toNumber } from "@/lib/format";
-import type { Cliente, Pedido, Producto, Trabajo } from "@/types";
+import { cn, formatCantidad, formatDate, formatDateTime, formatMoney, toNumber } from "@/lib/format";
+import type { Cliente, HistorialEntry, Pedido, Producto, Trabajo } from "@/types";
 import { ESTADOS_PEDIDO } from "./estados";
 import { TrabajoFormModal } from "./TrabajoFormModal";
+
+const accionTone = (accion: string) => {
+  if (accion === "CREAR" || accion === "COMPLETAR") return "success" as const;
+  if (accion === "ELIMINAR") return "danger" as const;
+  if (accion === "EDITAR" || accion === "CAMBIO_ESTADO") return "primary" as const;
+  return "neutral" as const;
+};
+
+const accionLabel = (accion: string) => accion.charAt(0).toUpperCase() + accion.slice(1).toLowerCase().replace(/_/g, " ");
 
 export function PedidoDetailModal({
   pedido,
@@ -37,6 +47,17 @@ export function PedidoDetailModal({
   const [toDeleteTrabajo, setToDeleteTrabajo] = useState<Trabajo | null>(null);
   const [borrandoTrabajo, setBorrandoTrabajo] = useState(false);
 
+  const pedidoId = pedido?.id ?? null;
+  const {
+    data: historial,
+    error: historialError,
+    isLoading: cargandoHistorial,
+    mutate: mutateHistorial,
+  } = useSWR<HistorialEntry[]>(
+    pedidoId ? `/historial?entidad=pedido&entidadId=${pedidoId}` : null,
+    fetcher,
+  );
+
   if (!pedido) return null;
 
   const trabajos = pedido.trabajos ?? [];
@@ -53,8 +74,8 @@ export function PedidoDetailModal({
     setSavingEstado(true);
     setError(null);
     try {
-      await api.patch(`/pedidos/${pedido.id}`, { estado });
       if (cobrar) await api.post(`/pedidos/${pedido.id}/pagos`);
+      await api.patch(`/pedidos/${pedido.id}`, { estado });
       await onChanged();
     } catch (err) {
       setError(getErrorMessage(err));
@@ -205,7 +226,7 @@ export function PedidoDetailModal({
                 </div>
                 <div>
                   <dt className="text-xs text-muted">Resta</dt>
-                  <dd className={cn("font-semibold tabular-nums", saldado ? "text-success" : "text-primary")}>{formatMoney(resta)}</dd>
+                  <dd className={cn("font-semibold tabular-nums", saldado ? "text-success" : "text-danger")}>{formatMoney(resta)}</dd>
                 </div>
               </dl>
             </div>
@@ -262,7 +283,7 @@ export function PedidoDetailModal({
                     return (
                       <tr key={t.id}>
                         <td className="px-3 py-2">{t.descripcion}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{cantidad}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatCantidad(cantidad)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{formatMoney(t.valorUnitario)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{formatMoney(subtotal)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{tieneCosto ? formatMoney(t.costoUnitario) : "—"}</td>
@@ -312,6 +333,35 @@ export function PedidoDetailModal({
           </dl>
         </section>
 
+        <details className="rounded-xl border border-line bg-background/50 p-4">
+          <summary className="cursor-pointer text-sm font-semibold">
+            Historial de este pedido
+            {historial && <span className="ml-2 font-normal text-muted">({historial.length})</span>}
+          </summary>
+          <div className="mt-4">
+            {cargandoHistorial ? (
+              <p className="text-sm text-muted">Cargando historial…</p>
+            ) : historialError ? (
+              <ErrorBanner message={getErrorMessage(historialError)} onRetry={() => void mutateHistorial()} />
+            ) : !historial?.length ? (
+              <p className="text-sm text-muted">Todavía no hay movimientos registrados para este pedido.</p>
+            ) : (
+              <ul className="flex flex-col gap-3">
+                {historial.map((h) => (
+                  <li key={h.id} className="border-b border-line pb-3 last:border-0 last:pb-0">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+                      <Badge tone={accionTone(h.accion)}>{accionLabel(h.accion)}</Badge>
+                      <span className="tabular-nums">{formatDateTime(h.fecha)}</span>
+                      <span>{h.usuario?.nombre ?? `Usuario #${h.usuarioId}`}</span>
+                    </div>
+                    <p className="mt-1 whitespace-pre-line text-sm text-pretty">{h.detalle}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </details>
+
         <div className="flex justify-between gap-2 border-t border-line pt-4">
           <Button variant="ghost" className="text-danger hover:bg-danger-soft" onClick={() => onDelete(pedido)}>
             <Trash2 className="size-4" aria-hidden="true" />
@@ -352,12 +402,14 @@ export function PedidoDetailModal({
       <ConfirmDialog
         open={confirmCobro}
         title="Pedido entregado con saldo"
-        message={`¿Cobraste el saldo de ${formatMoney(resta)}?`}
+        message={`El pedido queda en ENTREGADO. ¿Cobraste el saldo de ${formatMoney(resta)}?`}
         confirmLabel="Sí, cobré el saldo"
-        cancelLabel="No, sigue pendiente"
+        secondaryLabel="No, queda con saldo"
+        cancelLabel="Cancelar"
         confirmVariant="primary"
         onConfirm={() => confirmarCobro(true)}
-        onCancel={() => confirmarCobro(false)}
+        onSecondary={() => confirmarCobro(false)}
+        onCancel={() => setConfirmCobro(false)}
         loading={savingEstado}
       />
 

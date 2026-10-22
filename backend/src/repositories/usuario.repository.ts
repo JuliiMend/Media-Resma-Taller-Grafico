@@ -19,7 +19,9 @@ export const usuarioRepository = {
       where: { id },
       select: usuarioPublicSelect,
     }),
-  create: (data: any) => prisma.usuario.create({ data }),
-  update: (id: number, data: any) => prisma.usuario.update({ where: { id }, data }),
+  create: (data: any) =>
+    prisma.usuario.create({ data, select: usuarioPublicSelect }),
+  update: (id: number, data: any) =>
+    prisma.usuario.update({ where: { id }, data, select: usuarioPublicSelect }),
   remove: (id: number) => prisma.usuario.delete({ where: { id } }),
 };

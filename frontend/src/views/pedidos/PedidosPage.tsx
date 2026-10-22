@@ -1,41 +1,60 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
-import { ChevronRight, Plus } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { Plus } from "lucide-react";
 import { api, fetcher, getErrorMessage } from "@/api/client";
-import { cn, formatDate, formatMoney, toNumber } from "@/lib/format";
-import { Badge, Button, ConfirmDialog, EmptyState, ErrorBanner, LoadingState, PageHeader } from "@/components/ui";
-import { Pagination, clampPage, paginate } from "@/components/Pagination";
+import { cn, toNumber } from "@/lib/format";
+import { Button, ConfirmDialog, ErrorBanner, LoadingState, PageHeader } from "@/components/ui";
 import type { Cliente, Pedido, Producto } from "@/types";
-import { ESTADOS_PEDIDO, estadoInfo } from "./estados";
+import { DeudasTab } from "./DeudasTab";
 import { PedidoDetailModal } from "./PedidoDetailModal";
 import { PedidoFormModal } from "./PedidoFormModal";
+import { PedidosTab } from "./PedidosTab";
 
 export function PedidosPage() {
   const { data: pedidos, error, isLoading, mutate } = useSWR<Pedido[]>("/pedidos", fetcher);
   const { data: clientes } = useSWR<Cliente[]>("/clientes", fetcher);
   const { data: productos } = useSWR<Producto[]>("/productos", fetcher);
-  const [filtro, setFiltro] = useState<string>("ACTIVOS");
+  const [params, setParams] = useSearchParams();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Pedido | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [toDelete, setToDelete] = useState<Pedido | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
+
+  const vista = params.get("vista") === "deudas" ? "deudas" : "pedidos";
+  const pedidoParam = params.get("pedido");
 
   const clientesById = useMemo(() => new Map((clientes ?? []).map((c) => [c.id, c])), [clientes]);
   const list = pedidos ?? [];
-  const filtered = list.filter((p) => {
-    if (filtro === "TODOS") return true;
-    if (filtro === "ACTIVOS") return p.estado !== "ENTREGADO" && p.estado !== "CANCELADO";
-    return p.estado === filtro;
-  });
   const selected = list.find((p) => p.id === selectedId) ?? null;
-  const step = clampPage(page, filtered.length);
-  const pagina = paginate(filtered, page);
 
-  const activos = list.filter((p) => p.estado !== "ENTREGADO" && p.estado !== "CANCELADO").length;
-  const saldoPendiente = list.filter((p) => p.estado !== "CANCELADO").reduce((s, p) => s + toNumber(p.restaPagar), 0);
+  useEffect(() => {
+    if (!pedidoParam) return;
+    const id = Number(pedidoParam);
+    if (Number.isFinite(id) && id > 0) setSelectedId(id);
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("pedido");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [pedidoParam, setParams]);
+
+  function cambiarVista(next: "pedidos" | "deudas") {
+    setParams(
+      (prev) => {
+        const nextParams = new URLSearchParams(prev);
+        if (next === "deudas") nextParams.set("vista", "deudas");
+        else nextParams.delete("vista");
+        return nextParams;
+      },
+      { replace: true },
+    );
+  }
 
   async function handleDelete() {
     if (!toDelete) return;
@@ -53,13 +72,17 @@ export function PedidosPage() {
     }
   }
 
-  const filtros = [{ value: "ACTIVOS", label: "Activos" }, ...ESTADOS_PEDIDO, { value: "TODOS", label: "Todos" }];
+  const deudaCount = list.filter((p) => p.estado !== "CANCELADO" && toNumber(p.restaPagar) > 0).length;
+  const tabs = [
+    { value: "pedidos" as const, label: "Pedidos" },
+    { value: "deudas" as const, label: deudaCount > 0 ? `Deudas (${deudaCount})` : "Deudas" },
+  ];
 
   return (
     <div>
       <PageHeader
         title="Pedidos"
-        description="Seguimiento de los pedidos del taller."
+        description="Seguimiento de los pedidos y las deudas del taller."
         action={
           <Button onClick={() => setFormOpen(true)}>
             <Plus className="size-4" aria-hidden="true" />
@@ -68,35 +91,20 @@ export function PedidosPage() {
         }
       />
 
-      {pedidos && (
-        <div className="mb-6 grid grid-cols-2 gap-3 sm:max-w-md">
-          <div className="rounded-xl border border-line bg-surface px-4 py-3">
-            <p className="text-xs text-muted">Pedidos activos</p>
-            <p className="text-xl font-semibold tabular-nums">{activos}</p>
-          </div>
-          <div className="rounded-xl border border-line bg-surface px-4 py-3">
-            <p className="text-xs text-muted">Saldo por cobrar</p>
-            <p className="text-xl font-semibold tabular-nums">{formatMoney(saldoPendiente)}</p>
-          </div>
-        </div>
-      )}
-
-      <div className="mb-4 flex gap-2 overflow-x-auto pb-1" role="group" aria-label="Filtrar por estado">
-        {filtros.map((f) => (
+      <div className="mb-6 flex gap-1 rounded-xl border border-line bg-surface p-1" role="tablist" aria-label="Vista de pedidos">
+        {tabs.map((tab) => (
           <button
-            key={f.value}
+            key={tab.value}
             type="button"
-            onClick={() => {
-              setFiltro(f.value);
-              setPage(1);
-            }}
-            aria-pressed={filtro === f.value}
+            role="tab"
+            aria-selected={vista === tab.value}
+            onClick={() => cambiarVista(tab.value)}
             className={cn(
-              "whitespace-nowrap rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-              filtro === f.value ? "border-ink bg-ink text-background" : "border-line bg-surface hover:bg-raised",
+              "rounded-lg px-4 py-2 text-sm font-semibold transition-colors",
+              vista === tab.value ? "bg-ink text-background" : "text-muted hover:bg-ink/5 hover:text-ink",
             )}
           >
-            {f.label}
+            {tab.label}
           </button>
         ))}
       </div>
@@ -111,52 +119,15 @@ export function PedidosPage() {
         <LoadingState />
       ) : error ? (
         <ErrorBanner message={getErrorMessage(error)} onRetry={() => mutate()} />
-      ) : filtered.length === 0 ? (
-        <EmptyState
-          title={list.length ? "No hay pedidos con este filtro" : "Todavía no hay pedidos"}
-          description={list.length ? "Probá con otro estado." : "Creá el primer pedido para empezar."}
+      ) : vista === "deudas" ? (
+        <DeudasTab
+          pedidos={list}
+          clientesById={clientesById}
+          onOpen={(p) => setSelectedId(p.id)}
+          onChanged={() => void mutate()}
         />
       ) : (
-        <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
-          {pagina.map((p) => {
-            const estado = estadoInfo(p.estado);
-            const resta = toNumber(p.restaPagar);
-            return (
-              <li key={p.id}>
-                <button
-                  type="button"
-                  onClick={() => setSelectedId(p.id)}
-                  className="flex w-full items-center gap-4 px-4 py-3 text-left hover:bg-ink/5 focus-visible:bg-ink/5 focus-visible:outline-none"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium">{clientesById.get(p.clienteId)?.nombre ?? `Cliente #${p.clienteId}`}</span>
-                      <Badge tone={estado.tone}>{estado.label}</Badge>
-                    </div>
-                    <p className="mt-0.5 text-sm text-muted">
-                      #{p.id} · {formatDate(p.fecha)}
-                      {p.fechaEntrega && ` · Entrega ${formatDate(p.fechaEntrega)}`}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-muted">Resta</p>
-                    <p className={cn("font-semibold tabular-nums", resta > 0 ? "text-primary" : "text-success")}>{formatMoney(resta)}</p>
-                  </div>
-                  <ChevronRight className="size-4 shrink-0 text-muted" aria-hidden="true" />
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      {!isLoading && !error && (
-        <Pagination
-          total={filtered.length}
-          page={step}
-          onPageChange={setPage}
-          noun={{ one: "pedido", many: "pedidos" }}
-        />
+        <PedidosTab pedidos={list} clientesById={clientesById} onOpen={(p) => setSelectedId(p.id)} />
       )}
 
       <PedidoFormModal
