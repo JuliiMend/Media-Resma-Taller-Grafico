@@ -6,6 +6,7 @@ import { Layout } from "@/components/Layout";
 import { DashboardPage } from "@/views/DashboardPage";
 import { LoginPage } from "@/views/LoginPage";
 import { PedidosPage } from "@/views/pedidos/PedidosPage";
+import { PresupuestoPage } from "@/views/presupuestos/PresupuestoPage";
 import { TareasPage } from "@/views/TareasPage";
 import { ClientesPage, InsumosPage, ProductosPage } from "@/views/SimplePages";
 import { ComprasPage } from "@/views/ComprasPage";
@@ -25,6 +26,7 @@ export default function App() {
               <Route element={<Layout />}>
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/pedidos" element={<PedidosPage />} />
+                <Route path="/presupuestos" element={<PresupuestoPage />} />
                 <Route path="/clientes" element={<ClientesPage />} />
                 <Route path="/tareas" element={<TareasPage />} />
                 <Route path="/productos" element={<ProductosPage />} />

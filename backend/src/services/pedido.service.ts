@@ -2,6 +2,13 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../config/db";
 import { pedidoRepository } from "../repositories/pedido.repository";
 import { CrearPedidoInput, ActualizarPedidoInput } from "../schemas/pedido.schema";
+import { HttpError } from "../utils/http-error";
+import {
+  describirCambios,
+  ETIQUETAS_PEDIDO,
+  formatearMoneda,
+  registrarHistorial,
+} from "./historial.helper";
 
 type PedidoConDetalles = Prisma.PedidoGetPayload<{
   include: { cliente: true; trabajos: true };
@@ -59,6 +66,9 @@ const buscarConDetalles = async (
   return conTotales(pedido);
 };
 
+const describirCantidadTrabajos = (cantidad: number) =>
+  `${cantidad} ${cantidad === 1 ? "trabajo" : "trabajos"}`;
+
 export const pedidoService = {
   listar: async () => (await pedidoRepository.findAll()).map(conTotales),
 
@@ -94,15 +104,47 @@ export const pedidoService = {
       }
 
       await recalcularPedido(pedido.id, tx);
-      return buscarConDetalles(tx, pedido.id);
+      const creado = await buscarConDetalles(tx, pedido.id);
+
+      await registrarHistorial(tx, {
+        accion: "CREAR",
+        entidad: "pedido",
+        entidadId: pedido.id,
+        detalle:
+          `Creó el pedido #${pedido.id} para ${creado.cliente.nombre}: ` +
+          `${describirCantidadTrabajos(trabajos.length)}, total ${formatearMoneda(creado.total)}`,
+      });
+
+      return creado;
     });
   },
 
   actualizar: async (id: number, data: ActualizarPedidoInput) =>
     prisma.$transaction(async (tx) => {
+      const antes = await tx.pedido.findUnique({
+        where: { id },
+        include: { cliente: true, trabajos: true },
+      });
+      if (!antes) throw new HttpError(404, "Pedido no encontrado");
+
       await tx.pedido.update({ where: { id }, data });
       await recalcularPedido(id, tx);
-      return buscarConDetalles(tx, id);
+      const pedido = await buscarConDetalles(tx, id);
+
+      const cambios = describirCambios(antes, data, ETIQUETAS_PEDIDO);
+      if (cambios) {
+        await registrarHistorial(tx, {
+          accion:
+            data.estado !== undefined && data.estado !== antes.estado
+              ? "CAMBIO_ESTADO"
+              : "EDITAR",
+          entidad: "pedido",
+          entidadId: id,
+          detalle: cambios,
+        });
+      }
+
+      return pedido;
     }),
 
   pagar: async (id: number, monto?: number) =>
@@ -124,13 +166,28 @@ export const pedidoService = {
         where: { id },
         data: { sena: nuevaSena },
       });
-      await recalcularPedido(id, tx);
+      const actualizado = await recalcularPedido(id, tx);
+
+      await registrarHistorial(tx, {
+        accion: "EDITAR",
+        entidad: "pedido",
+        entidadId: id,
+        detalle:
+          `Registró un pago de ${formatearMoneda(nuevaSena - senaActual)}. ` +
+          `Resta ${formatearMoneda(actualizado.restaPagar)}`,
+      });
 
       return buscarConDetalles(tx, id);
     }),
 
   eliminar: async (id: number) =>
     prisma.$transaction(async (tx) => {
+      const pedido = await tx.pedido.findUnique({
+        where: { id },
+        include: { cliente: true, trabajos: true },
+      });
+      if (!pedido) throw new HttpError(404, "Pedido no encontrado");
+
       const trabajos = await tx.trabajo.findMany({
         where: { pedidoId: id },
         select: { id: true },
@@ -149,6 +206,17 @@ export const pedidoService = {
         data: { pedidoId: null },
       });
       await tx.trabajo.deleteMany({ where: { pedidoId: id } });
+
+      await registrarHistorial(tx, {
+        accion: "ELIMINAR",
+        entidad: "pedido",
+        entidadId: id,
+        detalle:
+          `Eliminó el pedido #${id} de ${pedido.cliente.nombre} ` +
+          `(total ${formatearMoneda(totalTrabajos(pedido.trabajos) + Number(pedido.envio ?? 0))}, ` +
+          `${describirCantidadTrabajos(pedido.trabajos.length)})`,
+      });
+
       await tx.pedido.delete({ where: { id } });
     }),
 

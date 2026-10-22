@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   ChartColumn,
   ClipboardList,
+  FileText,
   History,
   LayoutDashboard,
   LogOut,
@@ -24,6 +25,7 @@ import { cn } from "@/lib/format";
 const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/pedidos", label: "Pedidos", icon: ClipboardList },
+  { to: "/presupuestos", label: "Presupuestos", icon: FileText },
   { to: "/insumos", label: "Insumos", icon: Package },
   { to: "/clientes", label: "Clientes", icon: Users },
   { to: "/productos", label: "Productos", icon: ShoppingBag },
