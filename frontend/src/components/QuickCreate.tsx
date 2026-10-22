@@ -10,10 +10,14 @@ export function ClienteQuickModal({
   open,
   onClose,
   onCreated,
+  initialNombre = "",
+  initialTelefono = "",
 }: {
   open: boolean;
   onClose: () => void;
   onCreated: (cliente: Cliente) => void;
+  initialNombre?: string;
+  initialTelefono?: string;
 }) {
   const registrar = useRegistrarHistorial();
   const [nombre, setNombre] = useState("");
@@ -25,13 +29,13 @@ export function ClienteQuickModal({
 
   useEffect(() => {
     if (open) {
-      setNombre("");
-      setTelefono("");
+      setNombre(initialNombre);
+      setTelefono(initialTelefono);
       setUserContacto("");
       setNotas("");
       setError(null);
     }
-  }, [open]);
+  }, [open, initialNombre, initialTelefono]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
