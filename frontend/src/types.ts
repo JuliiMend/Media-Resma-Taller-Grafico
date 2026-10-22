@@ -100,6 +100,19 @@ export interface Pedido {
   ganancia?: Decimal | null;
 }
 
+export interface PaginaPedidos {
+  data: Pedido[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface ResumenPedidos {
+  activos: number;
+  saldoPendiente: Decimal;
+  conDeuda: number;
+}
+
 export interface FilaVenta {
   mes: string;
   productoId: number | null;

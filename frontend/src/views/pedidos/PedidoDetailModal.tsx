@@ -1,26 +1,40 @@
 import { useState, type FormEvent } from "react";
+import useSWR from "swr";
 import { Pencil, Plus, Trash2 } from "lucide-react";
-import { api, getErrorMessage } from "@/api/client";
+import { api, fetcher, getErrorMessage } from "@/api/client";
 import { Badge, Button, ConfirmDialog, ErrorBanner, Field, Input, Modal, Select } from "@/components/ui";
-import { cn, formatDate, formatMoney, toNumber } from "@/lib/format";
-import type { Cliente, Pedido, Producto, Trabajo } from "@/types";
+import { cn, formatCantidad, formatDate, formatDateTime, formatMoney, toNumber } from "@/lib/format";
+import type { Cliente, HistorialEntry, Pedido, Producto, Trabajo } from "@/types";
 import { ESTADOS_PEDIDO } from "./estados";
 import { TrabajoFormModal } from "./TrabajoFormModal";
+
+const accionTone = (accion: string) => {
+  if (accion === "CREAR" || accion === "COMPLETAR") return "success" as const;
+  if (accion === "ELIMINAR") return "danger" as const;
+  if (accion === "EDITAR" || accion === "CAMBIO_ESTADO") return "primary" as const;
+  return "neutral" as const;
+};
+
+const accionLabel = (accion: string) => accion.charAt(0).toUpperCase() + accion.slice(1).toLowerCase().replace(/_/g, " ");
 
 export function PedidoDetailModal({
   pedido,
   cliente,
   productos,
+  savingEstadoPedido = false,
   onClose,
   onChanged,
+  onCambiarEstado,
   onDelete,
   onEdit,
 }: {
   pedido: Pedido | null;
   cliente?: Cliente;
   productos: Producto[];
+  savingEstadoPedido?: boolean;
   onClose: () => void;
   onChanged: () => void | Promise<void>;
+  onCambiarEstado: (pedidoId: number, estado: string, cobrar: boolean) => Promise<void>;
   onDelete: (pedido: Pedido) => void;
   onEdit: (pedido: Pedido) => void;
 }) {
@@ -37,6 +51,17 @@ export function PedidoDetailModal({
   const [toDeleteTrabajo, setToDeleteTrabajo] = useState<Trabajo | null>(null);
   const [borrandoTrabajo, setBorrandoTrabajo] = useState(false);
 
+  const pedidoId = pedido?.id ?? null;
+  const {
+    data: historial,
+    error: historialError,
+    isLoading: cargandoHistorial,
+    mutate: mutateHistorial,
+  } = useSWR<HistorialEntry[]>(
+    pedidoId ? `/historial?entidad=pedido&entidadId=${pedidoId}` : null,
+    fetcher,
+  );
+
   if (!pedido) return null;
 
   const trabajos = pedido.trabajos ?? [];
@@ -46,6 +71,7 @@ export function PedidoDetailModal({
   const costoTotal = toNumber(pedido.costoTotal);
   const ganancia = toNumber(pedido.ganancia);
   const saldado = resta <= 0;
+  const bloqueado = savingEstado || savingEstadoPedido;
   const nombreCliente = pedido.cliente?.nombre ?? cliente?.nombre ?? `#${pedido.clienteId}`;
 
   async function guardarEstado(estado: string, cobrar: boolean) {
@@ -53,9 +79,7 @@ export function PedidoDetailModal({
     setSavingEstado(true);
     setError(null);
     try {
-      await api.patch(`/pedidos/${pedido.id}`, { estado });
-      if (cobrar) await api.post(`/pedidos/${pedido.id}/pagos`);
-      await onChanged();
+      await onCambiarEstado(pedido.id, estado, cobrar);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -155,7 +179,7 @@ export function PedidoDetailModal({
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="max-w-xs">
             <Field label="Estado" htmlFor="detail-estado">
-              <Select id="detail-estado" value={pedido.estado} disabled={savingEstado} onChange={(e) => changeEstado(e.target.value)}>
+              <Select id="detail-estado" value={pedido.estado} disabled={bloqueado} onChange={(e) => changeEstado(e.target.value)}>
                 {ESTADOS_PEDIDO.map((e) => (
                   <option key={e.value} value={e.value}>
                     {e.label}
@@ -205,7 +229,7 @@ export function PedidoDetailModal({
                 </div>
                 <div>
                   <dt className="text-xs text-muted">Resta</dt>
-                  <dd className={cn("font-semibold tabular-nums", saldado ? "text-success" : "text-primary")}>{formatMoney(resta)}</dd>
+                  <dd className={cn("font-semibold tabular-nums", saldado ? "text-success" : "text-danger")}>{formatMoney(resta)}</dd>
                 </div>
               </dl>
             </div>
@@ -214,10 +238,10 @@ export function PedidoDetailModal({
                 <Badge tone="success">Saldado</Badge>
               ) : (
                 <>
-                  <Button variant="secondary" size="sm" disabled={savingEstado} onClick={abrirPago}>
+                  <Button variant="secondary" size="sm" disabled={bloqueado} onClick={abrirPago}>
                     Registrar pago
                   </Button>
-                  <Button size="sm" disabled={savingEstado} onClick={() => setConfirmPagar(true)}>
+                  <Button size="sm" disabled={bloqueado} onClick={() => setConfirmPagar(true)}>
                     Marcar como pagado
                   </Button>
                 </>
@@ -262,7 +286,7 @@ export function PedidoDetailModal({
                     return (
                       <tr key={t.id}>
                         <td className="px-3 py-2">{t.descripcion}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{cantidad}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatCantidad(cantidad)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{formatMoney(t.valorUnitario)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{formatMoney(subtotal)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{tieneCosto ? formatMoney(t.costoUnitario) : "—"}</td>
@@ -312,6 +336,35 @@ export function PedidoDetailModal({
           </dl>
         </section>
 
+        <details className="rounded-xl border border-line bg-background/50 p-4">
+          <summary className="cursor-pointer text-sm font-semibold">
+            Historial de este pedido
+            {historial && <span className="ml-2 font-normal text-muted">({historial.length})</span>}
+          </summary>
+          <div className="mt-4">
+            {cargandoHistorial ? (
+              <p className="text-sm text-muted">Cargando historial…</p>
+            ) : historialError ? (
+              <ErrorBanner message={getErrorMessage(historialError)} onRetry={() => void mutateHistorial()} />
+            ) : !historial?.length ? (
+              <p className="text-sm text-muted">Todavía no hay movimientos registrados para este pedido.</p>
+            ) : (
+              <ul className="flex flex-col gap-3">
+                {historial.map((h) => (
+                  <li key={h.id} className="border-b border-line pb-3 last:border-0 last:pb-0">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+                      <Badge tone={accionTone(h.accion)}>{accionLabel(h.accion)}</Badge>
+                      <span className="tabular-nums">{formatDateTime(h.fecha)}</span>
+                      <span>{h.usuario?.nombre ?? `Usuario #${h.usuarioId}`}</span>
+                    </div>
+                    <p className="mt-1 whitespace-pre-line text-sm text-pretty">{h.detalle}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </details>
+
         <div className="flex justify-between gap-2 border-t border-line pt-4">
           <Button variant="ghost" className="text-danger hover:bg-danger-soft" onClick={() => onDelete(pedido)}>
             <Trash2 className="size-4" aria-hidden="true" />
@@ -352,13 +405,15 @@ export function PedidoDetailModal({
       <ConfirmDialog
         open={confirmCobro}
         title="Pedido entregado con saldo"
-        message={`¿Cobraste el saldo de ${formatMoney(resta)}?`}
+        message={`El pedido queda en ENTREGADO. ¿Cobraste el saldo de ${formatMoney(resta)}?`}
         confirmLabel="Sí, cobré el saldo"
-        cancelLabel="No, sigue pendiente"
+        secondaryLabel="No, queda con saldo"
+        cancelLabel="Cancelar"
         confirmVariant="primary"
         onConfirm={() => confirmarCobro(true)}
-        onCancel={() => confirmarCobro(false)}
-        loading={savingEstado}
+        onSecondary={() => confirmarCobro(false)}
+        onCancel={() => setConfirmCobro(false)}
+        loading={bloqueado}
       />
 
       <ConfirmDialog
@@ -369,7 +424,7 @@ export function PedidoDetailModal({
         confirmVariant="primary"
         onConfirm={() => void marcarComoPagado()}
         onCancel={() => setConfirmPagar(false)}
-        loading={savingEstado}
+        loading={bloqueado}
       />
 
       <ConfirmDialog

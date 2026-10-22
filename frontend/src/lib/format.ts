@@ -16,6 +16,12 @@ export function formatMoney(value: Decimal | null | undefined): string {
   return moneyFormatter.format(toNumber(value));
 }
 
+const cantidadFormatter = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 });
+
+export function formatCantidad(value: Decimal | null | undefined): string {
+  return cantidadFormatter.format(toNumber(value));
+}
+
 export function formatDate(value: string | null | undefined): string {
   if (!value) return "—";
   const d = new Date(value);

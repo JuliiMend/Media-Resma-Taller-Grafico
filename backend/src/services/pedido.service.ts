@@ -1,7 +1,14 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../config/db";
-import { pedidoRepository } from "../repositories/pedido.repository";
+import { PedidoFiltros, pedidoRepository } from "../repositories/pedido.repository";
 import { CrearPedidoInput, ActualizarPedidoInput } from "../schemas/pedido.schema";
+import { HttpError } from "../utils/http-error";
+import {
+  describirCambios,
+  ETIQUETAS_PEDIDO,
+  formatearMoneda,
+  registrarHistorial,
+} from "./historial.helper";
 
 type PedidoConDetalles = Prisma.PedidoGetPayload<{
   include: { cliente: true; trabajos: true };
@@ -59,8 +66,22 @@ const buscarConDetalles = async (
   return conTotales(pedido);
 };
 
+const describirCantidadTrabajos = (cantidad: number) =>
+  `${cantidad} ${cantidad === 1 ? "trabajo" : "trabajos"}`;
+
 export const pedidoService = {
-  listar: async () => (await pedidoRepository.findAll()).map(conTotales),
+  listar: async (filtros: PedidoFiltros = {}) =>
+    (await pedidoRepository.findAll(filtros)).map(conTotales),
+
+  listarPaginado: async (page: number, pageSize: number, filtros: PedidoFiltros = {}) => {
+    const { data, total } = await pedidoRepository.findAllPaginated(page, pageSize, filtros);
+    return {
+      data: data.map(conTotales),
+      total,
+      page,
+      pageSize,
+    };
+  },
 
   obtener: async (id: number) => {
     const pedido = await pedidoRepository.findById(id);
@@ -68,10 +89,20 @@ export const pedidoService = {
     return conTotales(pedido);
   },
 
+  resumen: () => pedidoRepository.resumen(),
+
   listarConSaldo: () => pedidoRepository.findConSaldo(),
 
   crear: async (data: CrearPedidoInput) => {
     const { trabajos = [], ...pedidoData } = data;
+
+    const totalPedido = totalTrabajos(trabajos) + Number(pedidoData.envio ?? 0);
+    if (Number(pedidoData.sena ?? 0) > totalPedido) {
+      throw new HttpError(
+        400,
+        `La seña no puede superar el total del pedido (${formatearMoneda(totalPedido)})`
+      );
+    }
 
     return prisma.$transaction(async (tx) => {
       const pedido = await tx.pedido.create({ data: pedidoData });
@@ -94,16 +125,87 @@ export const pedidoService = {
       }
 
       await recalcularPedido(pedido.id, tx);
-      return buscarConDetalles(tx, pedido.id);
+      const creado = await buscarConDetalles(tx, pedido.id);
+
+      await registrarHistorial(tx, {
+        accion: "CREAR",
+        entidad: "pedido",
+        entidadId: pedido.id,
+        detalle:
+          `Creó el pedido #${pedido.id} para ${creado.cliente.nombre}: ` +
+          `${describirCantidadTrabajos(trabajos.length)}, total ${formatearMoneda(creado.total)}`,
+      });
+
+      return creado;
     });
   },
 
-  actualizar: async (id: number, data: ActualizarPedidoInput) =>
-    prisma.$transaction(async (tx) => {
+  actualizar: async (id: number, data: ActualizarPedidoInput) => {
+    const soloEstado =
+      data.estado !== undefined &&
+      Object.keys(data).every((clave) => clave === "estado");
+
+    if (soloEstado) {
+      return prisma.$transaction(async (tx) => {
+        const antes = await pedidoRepository.findEstado(tx, id);
+        if (!antes) throw new HttpError(404, "Pedido no encontrado");
+
+        const actualizado = await pedidoRepository.updateEstado(tx, id, data.estado!);
+
+        if (actualizado.estado !== antes.estado) {
+          await registrarHistorial(tx, {
+            accion: "CAMBIO_ESTADO",
+            entidad: "pedido",
+            entidadId: id,
+            detalle: `Estado: ${antes.estado} → ${actualizado.estado}`,
+          });
+        }
+
+        return actualizado;
+      });
+    }
+
+    return prisma.$transaction(async (tx) => {
+      const antes = await tx.pedido.findUnique({
+        where: { id },
+        include: { cliente: true, trabajos: true },
+      });
+      if (!antes) throw new HttpError(404, "Pedido no encontrado");
+
+      if (data.sena !== undefined && data.sena !== null) {
+        const envio =
+          data.envio !== undefined
+            ? Number(data.envio ?? 0)
+            : Number(antes.envio ?? 0);
+        const total = totalTrabajos(antes.trabajos) + envio;
+        if (Number(data.sena) > total) {
+          throw new HttpError(
+            400,
+            `La seña no puede superar el total del pedido (${formatearMoneda(total)})`
+          );
+        }
+      }
+
       await tx.pedido.update({ where: { id }, data });
       await recalcularPedido(id, tx);
-      return buscarConDetalles(tx, id);
-    }),
+      const pedido = await buscarConDetalles(tx, id);
+
+      const cambios = describirCambios(antes, data, ETIQUETAS_PEDIDO);
+      if (cambios) {
+        await registrarHistorial(tx, {
+          accion:
+            data.estado !== undefined && data.estado !== antes.estado
+              ? "CAMBIO_ESTADO"
+              : "EDITAR",
+          entidad: "pedido",
+          entidadId: id,
+          detalle: cambios,
+        });
+      }
+
+      return pedido;
+    });
+  },
 
   pagar: async (id: number, monto?: number) =>
     prisma.$transaction(async (tx) => {
@@ -112,6 +214,9 @@ export const pedidoService = {
         include: { trabajos: true },
       });
       if (!pedido) throw new Error("Pedido no encontrado");
+      if (pedido.estado === "CANCELADO") {
+        throw new HttpError(409, "No se pueden registrar pagos de un pedido cancelado");
+      }
 
       const total = totalTrabajos(pedido.trabajos) + Number(pedido.envio ?? 0);
       const senaActual = Number(pedido.sena ?? 0);
@@ -124,13 +229,28 @@ export const pedidoService = {
         where: { id },
         data: { sena: nuevaSena },
       });
-      await recalcularPedido(id, tx);
+      const actualizado = await recalcularPedido(id, tx);
+
+      await registrarHistorial(tx, {
+        accion: "EDITAR",
+        entidad: "pedido",
+        entidadId: id,
+        detalle:
+          `Registró un pago de ${formatearMoneda(nuevaSena - senaActual)}. ` +
+          `Resta ${formatearMoneda(actualizado.restaPagar)}`,
+      });
 
       return buscarConDetalles(tx, id);
     }),
 
   eliminar: async (id: number) =>
     prisma.$transaction(async (tx) => {
+      const pedido = await tx.pedido.findUnique({
+        where: { id },
+        include: { cliente: true, trabajos: true },
+      });
+      if (!pedido) throw new HttpError(404, "Pedido no encontrado");
+
       const trabajos = await tx.trabajo.findMany({
         where: { pedidoId: id },
         select: { id: true },
@@ -149,6 +269,17 @@ export const pedidoService = {
         data: { pedidoId: null },
       });
       await tx.trabajo.deleteMany({ where: { pedidoId: id } });
+
+      await registrarHistorial(tx, {
+        accion: "ELIMINAR",
+        entidad: "pedido",
+        entidadId: id,
+        detalle:
+          `Eliminó el pedido #${id} de ${pedido.cliente.nombre} ` +
+          `(total ${formatearMoneda(totalTrabajos(pedido.trabajos) + Number(pedido.envio ?? 0))}, ` +
+          `${describirCantidadTrabajos(pedido.trabajos.length)})`,
+      });
+
       await tx.pedido.delete({ where: { id } });
     }),
 

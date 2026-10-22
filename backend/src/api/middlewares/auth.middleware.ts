@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { verificarToken } from "../../utils/jwt";
 import { HttpError } from "../../utils/http-error";
+import { requestContext } from "../../utils/request-context";
 
 declare global {
     namespace Express {
@@ -15,11 +16,13 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction) {
     if (!header?.startsWith("Bearer ")) {
         throw new HttpError(401, "No autenticado");
     }
+    let usuarioId: number;
     try {
         const payload = verificarToken(header.replace("Bearer ", ""));
-        req.usuarioId = payload.usuarioId;
-        next();
+        usuarioId = payload.usuarioId;
     } catch {
         throw new HttpError(401, "Token inválido o vencido");
     }
+    req.usuarioId = usuarioId;
+    requestContext.run({ usuarioId }, next);
 }

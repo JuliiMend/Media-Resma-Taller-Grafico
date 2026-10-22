@@ -1,5 +1,6 @@
 import { usuarioRepository } from "../repositories/usuario.repository";
 import { CrearUsuarioInput, ActualizarUsuarioInput } from "../schemas/usuario.schema";
+import { HttpError } from "../utils/http-error";
 import { hashPassword } from "../utils/password";
 
 export const usuarioService = {
@@ -7,7 +8,7 @@ export const usuarioService = {
 
   obtener: async (id: number) => {
     const usuario = await usuarioRepository.findById(id);
-    if (!usuario) throw new Error("Usuario no encontrado");
+    if (!usuario) throw new HttpError(404, "Usuario no encontrado");
     return usuario;
   },
 

@@ -9,6 +9,7 @@ import {
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from "react";
+import { createPortal } from "react-dom";
 import { AlertCircle, Inbox, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/format";
 
@@ -170,36 +171,80 @@ export function EmptyState({ title, description, action }: { title: string; desc
   );
 }
 
+const openModals = new Set<string>();
+let bodyOverflowBeforeModals = "";
+
+function registerModal(id: string) {
+  if (openModals.size === 0) bodyOverflowBeforeModals = document.body.style.overflow;
+  openModals.add(id);
+  document.body.style.overflow = "hidden";
+}
+
+function unregisterModal(id: string) {
+  openModals.delete(id);
+  if (openModals.size === 0) document.body.style.overflow = bodyOverflowBeforeModals;
+}
+
+function isTopModal(id: string): boolean {
+  let last: string | undefined;
+  for (const modalId of openModals) last = modalId;
+  return last === id;
+}
+
 export function Modal({
   open,
   onClose,
   title,
   children,
+  footer,
   size = "md",
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
+  footer?: ReactNode;
   size?: "md" | "lg";
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const modalId = useId();
   const titleId = useId();
 
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
-  }, [open]);
+    if (open) {
+      registerModal(modalId);
+      if (!dialog.open) dialog.showModal();
+    } else {
+      unregisterModal(modalId);
+      if (dialog.open) dialog.close();
+    }
+    return () => {
+      unregisterModal(modalId);
+      if (dialog.open) dialog.close();
+    };
+  }, [open, modalId]);
 
-  return (
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <dialog
       ref={ref}
       aria-labelledby={titleId}
-      onClose={onClose}
+      onCancel={(e) => {
+        // Escape cierra únicamente el modal superior de la pila.
+        e.preventDefault();
+        if (!isTopModal(modalId)) return;
+        onClose();
+      }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        // Un click dentro de un modal hijo nunca debe llegar a este handler.
+        e.stopPropagation();
+        // Cerrar solo si el click fue directo sobre el backdrop del propio dialog.
+        if (e.target !== e.currentTarget) return;
+        if (!isTopModal(modalId)) return;
+        onClose();
       }}
       className={cn(
         "m-auto w-[calc(100%-2rem)] rounded-2xl border border-line bg-surface p-0 text-ink shadow-2xl",
@@ -216,10 +261,12 @@ export function Modal({
               <X className="size-4" aria-hidden="true" />
             </Button>
           </div>
-          <div className="overflow-y-auto px-5 py-5">{children}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">{children}</div>
+          {footer && <div className="border-t border-line px-5 py-4">{footer}</div>}
         </div>
       )}
-    </dialog>
+    </dialog>,
+    document.body,
   );
 }
 
@@ -229,9 +276,11 @@ export function ConfirmDialog({
   message,
   onConfirm,
   onCancel,
+  onSecondary,
   loading,
   confirmLabel = "Eliminar",
   cancelLabel = "Cancelar",
+  secondaryLabel,
   confirmVariant,
 }: {
   open: boolean;
@@ -239,22 +288,35 @@ export function ConfirmDialog({
   message: string;
   onConfirm: () => void;
   onCancel: () => void;
+  onSecondary?: () => void;
   loading?: boolean;
   confirmLabel?: string;
   cancelLabel?: string;
+  secondaryLabel?: string;
   confirmVariant?: "danger" | "primary";
 }) {
   return (
-    <Modal open={open} onClose={onCancel} title={title}>
+    <Modal
+      open={open}
+      onClose={onCancel}
+      title={title}
+      footer={
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button variant="secondary" onClick={onCancel} disabled={loading}>
+            {cancelLabel}
+          </Button>
+          {onSecondary && secondaryLabel && (
+            <Button variant="secondary" onClick={onSecondary} disabled={loading}>
+              {secondaryLabel}
+            </Button>
+          )}
+          <Button variant={confirmVariant ?? "danger"} onClick={onConfirm} loading={loading}>
+            {confirmLabel}
+          </Button>
+        </div>
+      }
+    >
       <p className="text-sm text-muted text-pretty">{message}</p>
-      <div className="mt-6 flex justify-end gap-2">
-        <Button variant="secondary" onClick={onCancel} disabled={loading}>
-          {cancelLabel}
-        </Button>
-        <Button variant={confirmVariant ?? "danger"} onClick={onConfirm} loading={loading}>
-          {confirmLabel}
-        </Button>
-      </div>
     </Modal>
   );
 }
