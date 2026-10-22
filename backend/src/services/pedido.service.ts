@@ -72,6 +72,16 @@ const describirCantidadTrabajos = (cantidad: number) =>
 export const pedidoService = {
   listar: async () => (await pedidoRepository.findAll()).map(conTotales),
 
+  listarPaginado: async (page: number, pageSize: number) => {
+    const { data, total } = await pedidoRepository.findAllPaginated(page, pageSize);
+    return {
+      data: data.map(conTotales),
+      total,
+      page,
+      pageSize,
+    };
+  },
+
   obtener: async (id: number) => {
     const pedido = await pedidoRepository.findById(id);
     if (!pedido) throw new Error("Pedido no encontrado");
@@ -82,6 +92,14 @@ export const pedidoService = {
 
   crear: async (data: CrearPedidoInput) => {
     const { trabajos = [], ...pedidoData } = data;
+
+    const totalPedido = totalTrabajos(trabajos) + Number(pedidoData.envio ?? 0);
+    if (Number(pedidoData.sena ?? 0) > totalPedido) {
+      throw new HttpError(
+        400,
+        `La seña no puede superar el total del pedido (${formatearMoneda(totalPedido)})`
+      );
+    }
 
     return prisma.$transaction(async (tx) => {
       const pedido = await tx.pedido.create({ data: pedidoData });
@@ -127,6 +145,17 @@ export const pedidoService = {
       });
       if (!antes) throw new HttpError(404, "Pedido no encontrado");
 
+      if (data.sena !== undefined && data.sena !== null) {
+        const envio = data.envio !== undefined ? Number(data.envio ?? 0) : Number(antes.envio ?? 0);
+        const total = totalTrabajos(antes.trabajos) + envio;
+        if (Number(data.sena) > total) {
+          throw new HttpError(
+            400,
+            `La seña no puede superar el total del pedido (${formatearMoneda(total)})`
+          );
+        }
+      }
+
       await tx.pedido.update({ where: { id }, data });
       await recalcularPedido(id, tx);
       const pedido = await buscarConDetalles(tx, id);
@@ -154,6 +183,9 @@ export const pedidoService = {
         include: { trabajos: true },
       });
       if (!pedido) throw new Error("Pedido no encontrado");
+      if (pedido.estado === "CANCELADO") {
+        throw new HttpError(409, "No se pueden registrar pagos de un pedido cancelado");
+      }
 
       const total = totalTrabajos(pedido.trabajos) + Number(pedido.envio ?? 0);
       const senaActual = Number(pedido.sena ?? 0);

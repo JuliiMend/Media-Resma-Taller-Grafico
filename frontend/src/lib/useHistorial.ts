@@ -16,7 +16,11 @@ export function useRegistrarHistorial() {
       if (!user || !entidadId || entidadId < 1) return;
       try {
         await api.post("/historial", { accion, entidad, entidadId, detalle, usuarioId: user.id });
-        await mutate("/historial");
+        await mutate(
+          (key) => typeof key === "string" && (key === "/historial" || key.startsWith("/historial?")),
+          undefined,
+          { revalidate: true },
+        );
       } catch {
         // intentionally ignored
       }

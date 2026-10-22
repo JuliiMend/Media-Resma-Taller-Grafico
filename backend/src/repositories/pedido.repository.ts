@@ -8,6 +8,19 @@ export const pedidoRepository = {
             include: { cliente: true, trabajos: true },
         }),
 
+    findAllPaginated: async (page: number, pageSize: number) => {
+        const [total, data] = await prisma.$transaction([
+            prisma.pedido.count(),
+            prisma.pedido.findMany({
+                orderBy: { fecha: "desc" },
+                skip: (page - 1) * pageSize,
+                take: pageSize,
+                include: { cliente: true, trabajos: true },
+            }),
+        ]);
+        return { data, total };
+    },
+
     findById: (id: number) =>
         prisma.pedido.findUnique({
             where: { id },

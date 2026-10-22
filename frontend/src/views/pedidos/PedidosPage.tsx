@@ -27,7 +27,7 @@ export function PedidosPage() {
   const pedidoParam = params.get("pedido");
 
   const clientesById = useMemo(() => new Map((clientes ?? []).map((c) => [c.id, c])), [clientes]);
-  const list = pedidos ?? [];
+  const list = Array.isArray(pedidos) ? pedidos : [];
   const selected = list.find((p) => p.id === selectedId) ?? null;
 
   useEffect(() => {

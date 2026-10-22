@@ -32,7 +32,7 @@ function CardBody({ loading, error, onRetry, children }: { loading: boolean; err
 }
 
 function PedidosCard() {
-  const { data, error, isLoading, mutate } = useSWR<Pedido[]>("/pedidos", fetcher);
+  const { data, error, isLoading, mutate } = useSWR<Pedido[]>("/pedidos?vista=resumen", fetcher);
   const pedidos = data ?? [];
   const activos = pedidos.filter(esActivo);
   const saldo = pedidos.filter((p) => p.estado !== "CANCELADO").reduce((s, p) => s + toNumber(p.restaPagar), 0);
