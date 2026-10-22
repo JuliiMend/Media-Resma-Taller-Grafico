@@ -1,15 +1,18 @@
-import { useMemo } from "react";
-import { cn, formatDate, formatMoney, toDateInput, toNumber } from "@/lib/format";
-import { sortItems, type SortType } from "@/lib/sort";
+import { useEffect, useMemo, useRef, useState } from "react";
+import useSWR from "swr";
+import { Search } from "lucide-react";
+import { fetcher } from "@/api/client";
+import { cn, formatDate, formatMoney, toNumber } from "@/lib/format";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { useUrlParams, useUrlSort } from "@/lib/url-state";
 import { Badge, Button, EmptyState, Field, Input, Select } from "@/components/ui";
+import { Pagination } from "@/components/Pagination";
 import { SearchSelect } from "@/components/SearchSelect";
 import { SortControl, SortableHeader } from "@/components/SortableHeader";
-import type { Cliente, Pedido, Producto } from "@/types";
-import { ESTADOS_PEDIDO, estadoInfo } from "./estados";
+import type { Cliente, Pedido, Producto, ResumenPedidos } from "@/types";
+import { ESTADOS_PEDIDO, estadoInfo, resolveEstados } from "./estados";
 
 const ESTADOS_VALUES: string[] = ESTADOS_PEDIDO.map((e) => e.value);
-const DEFAULT_ACTIVOS = ["PENDIENTE", "EN_PROCESO", "LISTO"];
 
 const SORT_FIELDS = [
   { key: "fecha", label: "Fecha" },
@@ -19,48 +22,30 @@ const SORT_FIELDS = [
   { key: "resta", label: "Debe" },
 ];
 
-function sortValueOf(p: Pedido, key: string, clientesById: Map<number, Cliente>): unknown {
-  if (key === "entrega") return p.fechaEntrega;
-  if (key === "cliente") return clientesById.get(p.clienteId)?.nombre ?? "";
-  if (key === "total") return toNumber(p.sena) + toNumber(p.restaPagar);
-  if (key === "resta") return toNumber(p.restaPagar);
-  return p.fecha;
-}
-
-const SORT_TYPES: Record<string, SortType> = {
-  fecha: "fecha",
-  entrega: "fecha",
-  cliente: "texto",
-  total: "numero",
-  resta: "numero",
-};
-
-function addDaysIso(iso: string, days: number): string {
-  const d = new Date(`${iso}T00:00:00.000Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-function resolveEstados(param: string): string[] {
-  if (param === "TODOS") return [...ESTADOS_VALUES];
-  if (param === "NONE") return [];
-  if (param) return param.split(",").filter((s) => ESTADOS_VALUES.includes(s));
-  return [...DEFAULT_ACTIVOS];
-}
-
-const esDefault = (list: string[]) =>
-  list.length === DEFAULT_ACTIVOS.length && DEFAULT_ACTIVOS.every((e) => list.includes(e));
-
 export function PedidosTab({
   pedidos,
+  total,
+  page,
+  pageSize,
+  resumen,
+  savingId,
   clientesById,
   productos,
   onOpen,
+  onPageChange,
+  onPageSizeChange,
 }: {
   pedidos: Pedido[];
+  total: number;
+  page: number;
+  pageSize: number;
+  resumen?: ResumenPedidos;
+  savingId?: number | null;
   clientesById: Map<number, Cliente>;
   productos: Producto[];
   onOpen: (pedido: Pedido) => void;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
 }) {
   const { params, update } = useUrlParams();
   const estadosParam = params.get("estados") ?? "";
@@ -68,46 +53,60 @@ export function PedidosTab({
   const productoId = params.get("productoId") ?? "";
   const desde = params.get("desde") ?? "";
   const hasta = params.get("hasta") ?? "";
+  const q = params.get("q") ?? "";
   const soloDeuda = params.get("deuda") === "1";
   const entrega7 = params.get("entrega7") === "1";
   const { key: sortKey, dir: sortDir, setSort } = useUrlSort({ key: "fecha", dir: "desc" });
 
-  const estadosActivos = resolveEstados(estadosParam);
+  const estadosActivos = resolveEstados(estadosParam || null);
   const filterCount =
     (estadosParam ? 1 : 0) +
     (clienteId ? 1 : 0) +
     (productoId ? 1 : 0) +
     (desde ? 1 : 0) +
     (hasta ? 1 : 0) +
+    (q ? 1 : 0) +
     (soloDeuda ? 1 : 0) +
     (entrega7 ? 1 : 0);
 
-  const hoy = new Date().toISOString().slice(0, 10);
-  const limite7 = addDaysIso(hoy, 7);
-
-  const filtrados = pedidos.filter((p) => {
-    if (!estadosActivos.includes(p.estado)) return false;
-    if (clienteId && String(p.clienteId) !== clienteId) return false;
-    const day = toDateInput(p.fecha);
-    if (desde && day < desde) return false;
-    if (hasta && day > hasta) return false;
-    if (soloDeuda && !(p.estado !== "CANCELADO" && toNumber(p.restaPagar) > 0)) return false;
-    if (entrega7) {
-      if (!p.fechaEntrega) return false;
-      const e = toDateInput(p.fechaEntrega);
-      if (e < hoy || e > limite7) return false;
-    }
-    return true;
-  });
-
   const effectiveKey = SORT_FIELDS.some((f) => f.key === sortKey) ? sortKey : "fecha";
-  const ordered = sortItems(
-    filtrados,
-    (p) => sortValueOf(p, effectiveKey, clientesById),
-    SORT_TYPES[effectiveKey] ?? "fecha",
-    sortDir,
-  );
   const sortView = { key: effectiveKey, dir: sortDir };
+
+  const [qInput, setQInput] = useState(q);
+  const [sugerenciasOpen, setSugerenciasOpen] = useState(false);
+  const qDebounced = useDebouncedValue(qInput, 300);
+  const qActual = useRef(q);
+  const primerDebounce = useRef(true);
+  const { data: sugerencias } = useSWR<string[]>(
+    qDebounced.trim().length >= 2
+      ? `/trabajos/sugerencias?q=${encodeURIComponent(qDebounced.trim())}`
+      : null,
+    fetcher,
+  );
+
+  useEffect(() => {
+    qActual.current = q;
+    setQInput(q);
+  }, [q]);
+
+  useEffect(() => {
+    if (primerDebounce.current) {
+      primerDebounce.current = false;
+      return;
+    }
+    const limpio = qDebounced.trim();
+    if (limpio === qActual.current) return;
+    update({ q: limpio || null, page: null });
+  }, [qDebounced, update]);
+
+  useEffect(() => {
+    if (!sugerenciasOpen) return;
+    function cerrar() {
+      setSugerenciasOpen(false);
+    }
+    window.addEventListener("pointerdown", cerrar);
+    return () => window.removeEventListener("pointerdown", cerrar);
+  }, [sugerenciasOpen]);
 
   const clientes = useMemo(
     () => [...clientesById.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
@@ -119,23 +118,46 @@ export function PedidosTab({
     [productos],
   );
 
-  const activos = pedidos.filter((p) => p.estado !== "ENTREGADO" && p.estado !== "CANCELADO").length;
-  const saldoPendiente = pedidos.filter((p) => p.estado !== "CANCELADO").reduce((s, p) => s + toNumber(p.restaPagar), 0);
+  const activos = resumen?.activos ?? 0;
+  const saldoPendiente = toNumber(resumen?.saldoPendiente);
+
+  function aplicarBusqueda(valor: string) {
+    setQInput(valor);
+    setSugerenciasOpen(false);
+    update({ q: valor.trim() || null, page: null });
+  }
 
   function writeEstados(list: string[]) {
     const sorted = [...list].sort();
-    if (sorted.length === ESTADOS_VALUES.length) update({ estados: "TODOS" });
-    else if (esDefault(sorted)) update({ estados: null });
-    else if (sorted.length === 0) update({ estados: "NONE" });
-    else update({ estados: sorted.join(",") });
+    if (sorted.length === ESTADOS_VALUES.length) update({ estados: "TODOS", page: null });
+    else if (sorted.length === 0) update({ estados: "NONE", page: null });
+    else update({ estados: sorted.join(","), page: null });
   }
 
   function toggleEstado(value: string) {
-    writeEstados(estadosActivos.includes(value) ? estadosActivos.filter((e) => e !== value) : [...estadosActivos, value]);
+    writeEstados(
+      estadosActivos.includes(value)
+        ? estadosActivos.filter((e) => e !== value)
+        : [...estadosActivos, value],
+    );
   }
 
   function clearAllFilters() {
-    update({ estados: null, cliente: null, productoId: null, desde: null, hasta: null, deuda: null, entrega7: null });
+    update({
+      estados: null,
+      cliente: null,
+      productoId: null,
+      desde: null,
+      hasta: null,
+      q: null,
+      deuda: null,
+      entrega7: null,
+      page: null,
+    });
+  }
+
+  function cambiarOrden(next: Parameters<typeof setSort>[0]) {
+    setSort(next);
   }
 
   const toggleClass = (active: boolean) =>
@@ -180,7 +202,9 @@ export function PedidosTab({
             aria-pressed={estadosActivos.includes(e.value)}
             className={cn(
               "whitespace-nowrap rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-              estadosActivos.includes(e.value) ? "border-ink bg-ink text-background" : "border-line bg-surface hover:bg-raised",
+              estadosActivos.includes(e.value)
+                ? "border-ink bg-ink text-background"
+                : "border-line bg-surface hover:bg-raised",
             )}
           >
             {e.label}
@@ -188,11 +212,13 @@ export function PedidosTab({
         ))}
         <button
           type="button"
-          onClick={() => update({ estados: "TODOS" })}
+          onClick={() => update({ estados: "TODOS", page: null })}
           aria-pressed={estadosActivos.length === ESTADOS_VALUES.length}
           className={cn(
             "whitespace-nowrap rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-            estadosActivos.length === ESTADOS_VALUES.length ? "border-ink bg-ink text-background" : "border-line bg-surface hover:bg-raised",
+            estadosActivos.length === ESTADOS_VALUES.length
+              ? "border-ink bg-ink text-background"
+              : "border-line bg-surface hover:bg-raised",
           )}
         >
           Todos
@@ -200,8 +226,56 @@ export function PedidosTab({
       </div>
 
       <div className="mb-3 flex flex-wrap items-end gap-3">
+        <div className="w-full max-w-sm">
+          <Field label="Buscar" htmlFor="pedidos-buscar">
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted"
+                aria-hidden="true"
+              />
+              <Input
+                id="pedidos-buscar"
+                value={qInput}
+                onChange={(e) => {
+                  setQInput(e.target.value);
+                  setSugerenciasOpen(true);
+                }}
+                onFocus={() => setSugerenciasOpen(true)}
+                onPointerDown={(e) => e.stopPropagation()}
+                placeholder="Cliente, trabajo o producto…"
+                className="pl-9"
+                autoComplete="off"
+                aria-autocomplete="list"
+                aria-expanded={sugerenciasOpen && Boolean(sugerencias?.length)}
+              />
+              {sugerenciasOpen && sugerencias && sugerencias.length > 0 && (
+                <ul className="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-line bg-surface py-1 shadow-lg">
+                  {sugerencias.map((sugerencia) => (
+                    <li key={sugerencia}>
+                      <button
+                        type="button"
+                        onPointerDown={(e) => {
+                          e.preventDefault();
+                          aplicarBusqueda(sugerencia);
+                        }}
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-raised focus-visible:bg-raised focus-visible:outline-none"
+                      >
+                        {sugerencia}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </Field>
+        </div>
         <Field label="Cliente" htmlFor="pedidos-cliente">
-          <Select id="pedidos-cliente" value={clienteId} onChange={(e) => update({ cliente: e.target.value })} className="w-52">
+          <Select
+            id="pedidos-cliente"
+            value={clienteId}
+            onChange={(e) => update({ cliente: e.target.value, page: null })}
+            className="w-52"
+          >
             <option value="">Todos</option>
             {clientes.map((c) => (
               <option key={c.id} value={c.id}>
@@ -216,7 +290,7 @@ export function PedidosTab({
               id="pedidos-producto"
               options={productoOptions}
               value={productoId}
-              onChange={(value) => update({ productoId: value })}
+              onChange={(value) => update({ productoId: value, page: null })}
               placeholder="Buscar producto…"
               emptyLabel="Todos los productos"
               clearable
@@ -224,27 +298,49 @@ export function PedidosTab({
           </div>
         </Field>
         <Field label="Desde" htmlFor="pedidos-desde">
-          <Input id="pedidos-desde" type="date" value={desde} max={hasta || undefined} onChange={(e) => update({ desde: e.target.value })} className="w-40" />
+          <Input
+            id="pedidos-desde"
+            type="date"
+            value={desde}
+            max={hasta || undefined}
+            onChange={(e) => update({ desde: e.target.value, page: null })}
+            className="w-40"
+          />
         </Field>
         <Field label="Hasta" htmlFor="pedidos-hasta">
-          <Input id="pedidos-hasta" type="date" value={hasta} min={desde || undefined} onChange={(e) => update({ hasta: e.target.value })} className="w-40" />
+          <Input
+            id="pedidos-hasta"
+            type="date"
+            value={hasta}
+            min={desde || undefined}
+            onChange={(e) => update({ hasta: e.target.value, page: null })}
+            className="w-40"
+          />
         </Field>
-        <button type="button" onClick={() => update({ deuda: soloDeuda ? null : "1" })} aria-pressed={soloDeuda} className={toggleClass(soloDeuda)}>
+        <button
+          type="button"
+          onClick={() => update({ deuda: soloDeuda ? null : "1", page: null })}
+          aria-pressed={soloDeuda}
+          className={toggleClass(soloDeuda)}
+        >
           Con deuda
         </button>
-        <button type="button" onClick={() => update({ entrega7: entrega7 ? null : "1" })} aria-pressed={entrega7} className={toggleClass(entrega7)}>
+        <button
+          type="button"
+          onClick={() => update({ entrega7: entrega7 ? null : "1", page: null })}
+          aria-pressed={entrega7}
+          className={toggleClass(entrega7)}
+        >
           Entrega en 7 días
         </button>
       </div>
 
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <div className="w-full max-w-xs">
-          <SortControl fields={SORT_FIELDS} sort={sortView} onSort={setSort} />
+          <SortControl fields={SORT_FIELDS} sort={sortView} onSort={cambiarOrden} />
         </div>
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
-          <span>
-            Mostrando {filtrados.length} de {pedidos.length}
-          </span>
+          <span className="tabular-nums">{total} pedidos</span>
           {filterCount > 0 && (
             <Button variant="ghost" size="sm" onClick={clearAllFilters}>
               Limpiar filtros
@@ -253,10 +349,18 @@ export function PedidosTab({
         </div>
       </div>
 
-      {filtrados.length === 0 ? (
+      {pedidos.length === 0 ? (
         <EmptyState
-          title={pedidos.length ? "No hay pedidos con este filtro" : "Todavía no hay pedidos"}
-          description={pedidos.length ? "Probá con otros filtros." : "Creá el primer pedido para empezar."}
+          title={
+            total === 0 && filterCount === 0
+              ? "Todavía no hay pedidos"
+              : "No hay pedidos con este filtro"
+          }
+          description={
+            total === 0 && filterCount === 0
+              ? "Creá el primer pedido para empezar."
+              : "Probá con otros filtros."
+          }
         />
       ) : (
         <>
@@ -264,33 +368,48 @@ export function PedidosTab({
             <table className="w-full text-sm">
               <thead className="border-b border-line bg-background/60 text-left text-xs uppercase tracking-wide text-muted">
                 <tr>
-                  <SortableHeader label="Fecha" sortKey="fecha" sort={sortView} onSort={setSort} />
-                  <SortableHeader label="Cliente" sortKey="cliente" sort={sortView} onSort={setSort} />
+                  <SortableHeader label="Fecha" sortKey="fecha" sort={sortView} onSort={cambiarOrden} />
+                  <SortableHeader label="Cliente" sortKey="cliente" sort={sortView} onSort={cambiarOrden} />
                   <th scope="col" className="px-4 py-3 font-medium">Estado</th>
-                  <SortableHeader label="Entrega" sortKey="entrega" sort={sortView} onSort={setSort} />
-                  <SortableHeader label="Total" sortKey="total" sort={sortView} onSort={setSort} align="right" />
-                  <SortableHeader label="Debe" sortKey="resta" sort={sortView} onSort={setSort} align="right" />
+                  <SortableHeader label="Entrega" sortKey="entrega" sort={sortView} onSort={cambiarOrden} />
+                  <SortableHeader label="Total" sortKey="total" sort={sortView} onSort={cambiarOrden} align="right" />
+                  <SortableHeader label="Debe" sortKey="resta" sort={sortView} onSort={cambiarOrden} align="right" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {ordered.map((p) => {
+                {pedidos.map((p) => {
                   const estado = estadoInfo(p.estado);
+                  const guardando = savingId === p.id;
                   return (
                     <tr
                       key={p.id}
-                      tabIndex={0}
-                      onClick={() => onOpen(p)}
-                      onKeyDown={openOnKey(p)}
-                      className="cursor-pointer hover:bg-ink/5 focus-visible:bg-ink/5 focus-visible:outline-none"
+                      tabIndex={guardando ? -1 : 0}
+                      aria-busy={guardando}
+                      onClick={() => {
+                        if (!guardando) onOpen(p);
+                      }}
+                      onKeyDown={guardando ? undefined : openOnKey(p)}
+                      className={cn(
+                        "cursor-pointer hover:bg-ink/5 focus-visible:bg-ink/5 focus-visible:outline-none",
+                        guardando && "pointer-events-none opacity-60",
+                      )}
                     >
                       <td className="px-4 py-3">
                         <span className="font-medium">#{p.id}</span>
                         <span className="ml-2 text-muted">{formatDate(p.fecha)}</span>
                       </td>
-                      <td className="px-4 py-3">{clientesById.get(p.clienteId)?.nombre ?? `Cliente #${p.clienteId}`}</td>
-                      <td className="px-4 py-3"><Badge tone={estado.tone}>{estado.label}</Badge></td>
-                      <td className="px-4 py-3 text-muted">{p.fechaEntrega ? formatDate(p.fechaEntrega) : "—"}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">{formatMoney(toNumber(p.sena) + toNumber(p.restaPagar))}</td>
+                      <td className="px-4 py-3">
+                        {clientesById.get(p.clienteId)?.nombre ?? `Cliente #${p.clienteId}`}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge tone={estado.tone}>{estado.label}</Badge>
+                      </td>
+                      <td className="px-4 py-3 text-muted">
+                        {p.fechaEntrega ? formatDate(p.fechaEntrega) : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {formatMoney(toNumber(p.sena) + toNumber(p.restaPagar))}
+                      </td>
                       <td className="px-4 py-3 text-right">{debeCell(p)}</td>
                     </tr>
                   );
@@ -300,21 +419,28 @@ export function PedidosTab({
           </div>
 
           <ul className="flex flex-col gap-3 md:hidden">
-            {ordered.map((p) => {
+            {pedidos.map((p) => {
               const estado = estadoInfo(p.estado);
               const resta = toNumber(p.restaPagar);
+              const guardando = savingId === p.id;
               return (
-                <li key={p.id} className="rounded-xl border border-line bg-surface p-4">
+                <li key={p.id} className={cn("rounded-xl border border-line bg-surface p-4", guardando && "opacity-60")}>
                   <button
                     type="button"
+                    disabled={guardando}
+                    aria-busy={guardando}
                     onClick={() => onOpen(p)}
                     className="flex w-full items-start gap-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium">{clientesById.get(p.clienteId)?.nombre ?? `Cliente #${p.clienteId}`}</span>
+                        <span className="font-medium">
+                          {clientesById.get(p.clienteId)?.nombre ?? `Cliente #${p.clienteId}`}
+                        </span>
                         <Badge tone={estado.tone}>{estado.label}</Badge>
-                        {resta > 0 && p.estado !== "CANCELADO" && <Badge tone="danger">Debe {formatMoney(resta)}</Badge>}
+                        {resta > 0 && p.estado !== "CANCELADO" && (
+                          <Badge tone="danger">Debe {formatMoney(resta)}</Badge>
+                        )}
                       </div>
                       <p className="mt-0.5 text-sm text-muted">
                         #{p.id} · {formatDate(p.fecha)}
@@ -323,9 +449,18 @@ export function PedidosTab({
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-muted">Total</p>
-                      <p className="font-semibold tabular-nums">{formatMoney(toNumber(p.sena) + resta)}</p>
-                      <p className={cn("mt-1 text-xs tabular-nums", resta > 0 && p.estado !== "CANCELADO" ? "text-danger" : "text-muted")}>
-                        {resta > 0 && p.estado !== "CANCELADO" ? `Debe ${formatMoney(resta)}` : "Sin deuda"}
+                      <p className="font-semibold tabular-nums">
+                        {formatMoney(toNumber(p.sena) + resta)}
+                      </p>
+                      <p
+                        className={cn(
+                          "mt-1 text-xs tabular-nums",
+                          resta > 0 && p.estado !== "CANCELADO" ? "text-danger" : "text-muted",
+                        )}
+                      >
+                        {resta > 0 && p.estado !== "CANCELADO"
+                          ? `Debe ${formatMoney(resta)}`
+                          : "Sin deuda"}
                       </p>
                     </div>
                   </button>
@@ -333,6 +468,17 @@ export function PedidosTab({
               );
             })}
           </ul>
+
+          <Pagination
+            total={total}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={onPageChange}
+            pageSizeOptions={[25, 50, 100]}
+            onPageSizeChange={onPageSizeChange}
+            prefix="Mostrando "
+            noun={{ one: "pedido", many: "pedidos" }}
+          />
         </>
       )}
     </div>

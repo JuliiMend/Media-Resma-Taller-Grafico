@@ -9,7 +9,7 @@ const formatearFecha = (fecha: Date) => {
 };
 
 export const reporteService = {
-  ventas: ({ desde, hasta, productoId }: VentasQueryInput) => {
+  ventas: ({ desde, hasta, productoId, q }: VentasQueryInput) => {
     const hastaFinal = hasta ?? formatearFecha(new Date());
 
     let desdeFinal = desde;
@@ -19,6 +19,6 @@ export const reporteService = {
       desdeFinal = formatearFecha(fechaDesde);
     }
 
-    return reporteRepository.ventas(desdeFinal, hastaFinal, productoId);
+    return reporteRepository.ventas(desdeFinal, hastaFinal, productoId, q);
   },
 };

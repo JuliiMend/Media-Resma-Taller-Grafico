@@ -108,7 +108,7 @@ export function TrabajoFormModal({
         </Field>
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Cantidad" htmlFor="t-cant">
-            <Input id="t-cant" type="number" min={0} step="any" inputMode="decimal" value={cantidad} onChange={(e) => setCantidad(e.target.value)} />
+            <Input id="t-cant" type="number" min={0} step="any" inputMode="decimal" value={cantidad} onChange={(e) => setCantidad(e.target.value)} className="min-w-[7rem] text-right tabular-nums" />
           </Field>
           <Field label="Valor unitario" htmlFor="t-valor">
             <Input id="t-valor" type="number" min={0} step="0.01" value={valorUnitario} onChange={(e) => setValorUnitario(e.target.value)} />

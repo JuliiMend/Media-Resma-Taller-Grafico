@@ -1,28 +1,17 @@
-import { LOGO_PDF_URL } from "@/lib/presupuesto-config";
+import { LOGO_PDF_DATA_URL } from "@/lib/presupuesto-logo-data";
 
 let cache: Promise<string | null> | null = null;
 
 /**
- * Descarga el logo del PDF y lo devuelve como dataURL (se cachea en memoria).
- * Si falla se devuelve null y el PDF se genera igual, sin logo.
+ * Devuelve el logo embebido como dataURL (se cachea en memoria).
+ * Si el archivo no es válido se devuelve null y el PDF usa el texto de respaldo.
  */
 export function cargarLogoDataUrl(): Promise<string | null> {
   if (!cache) {
-    cache = (async () => {
-      try {
-        const res = await fetch(LOGO_PDF_URL);
-        if (!res.ok) return null;
-        const blob = await res.blob();
-        return await new Promise<string | null>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
-          reader.onerror = () => resolve(null);
-          reader.readAsDataURL(blob);
-        });
-      } catch {
-        return null;
-      }
-    })();
+    const valido =
+      LOGO_PDF_DATA_URL.startsWith("data:image/png;base64,") &&
+      LOGO_PDF_DATA_URL.length > 100;
+    cache = Promise.resolve(valido ? LOGO_PDF_DATA_URL : null);
   }
   return cache;
 }

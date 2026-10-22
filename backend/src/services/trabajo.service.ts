@@ -15,6 +15,8 @@ import {
 export const trabajoService = {
   listar: () => trabajoRepository.findAll(),
 
+  sugerencias: (q: string) => trabajoRepository.sugerencias(q),
+
   obtener: async (id: number) => {
     const trabajo = await trabajoRepository.findById(id);
     if (!trabajo) throw new Error("Trabajo no encontrado");

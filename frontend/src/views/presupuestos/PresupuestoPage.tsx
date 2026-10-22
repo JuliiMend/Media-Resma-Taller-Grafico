@@ -162,6 +162,7 @@ export function PresupuestoPage() {
   const omitirGuardado = useRef(false);
 
   const [error, setError] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const [generandoPdf, setGenerandoPdf] = useState(false);
   const [compartiendo, setCompartiendo] = useState(false);
@@ -182,6 +183,16 @@ export function PresupuestoPage() {
 
   useEffect(() => {
     setRestaurado(Boolean(leerBorrador()));
+  }, []);
+
+  useEffect(() => {
+    let activo = true;
+    void cargarLogoDataUrl().then((logo) => {
+      if (activo && !logo) setLogoError(true);
+    });
+    return () => {
+      activo = false;
+    };
   }, []);
 
   // Borrador en localStorage (con debounce) para no perder lo cargado al recargar.
@@ -344,6 +355,7 @@ export function PresupuestoPage() {
     setError(null);
     try {
       const logo = await cargarLogoDataUrl();
+      setLogoError(!logo);
       await descargarPresupuestoPdf(datosPdf, logo, nombreArchivo);
     } catch (err) {
       setError(getErrorMessage(err));
@@ -395,6 +407,7 @@ export function PresupuestoPage() {
     setError(null);
     try {
       const logo = await cargarLogoDataUrl();
+      setLogoError(!logo);
       const blob = await generarPresupuestoPdf(datosPdf, logo);
       const archivo = new File([blob], nombreArchivo, { type: "application/pdf" });
       if (!navigator.canShare?.({ files: [archivo] })) {
@@ -493,6 +506,16 @@ export function PresupuestoPage() {
       )}
 
       {error && <ErrorBanner message={error} />}
+
+      {logoError && (
+        <div
+          role="status"
+          className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning-soft/40 px-4 py-3 text-sm text-warning"
+        >
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <p>No se pudo cargar el logo. El PDF se genera con “MEDIA RESMA” como respaldo.</p>
+        </div>
+      )}
 
       <Card title="Datos del presupuesto" icon={<FileText className="size-4" aria-hidden="true" />}>
         <div className="flex flex-col gap-5">
@@ -644,7 +667,7 @@ export function PresupuestoPage() {
                       </Select>
                     </Field>
                   </div>
-                  <div className="sm:col-span-2">
+                  <div className="sm:col-span-3">
                     <Field label="Cantidad" htmlFor={`l-cant-${linea.key}`}>
                       <Input
                         id={`l-cant-${linea.key}`}
@@ -654,10 +677,11 @@ export function PresupuestoPage() {
                         inputMode="decimal"
                         value={linea.cantidad}
                         onChange={(e) => patchLinea(linea.key, { cantidad: e.target.value })}
+                        className="min-w-[7rem] text-right tabular-nums"
                       />
                     </Field>
                   </div>
-                  <div className="sm:col-span-4">
+                  <div className="sm:col-span-3">
                     <Field label="Precio unitario" htmlFor={`l-precio-${linea.key}`}>
                       <Input
                         id={`l-precio-${linea.key}`}

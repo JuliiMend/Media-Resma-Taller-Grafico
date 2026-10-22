@@ -21,16 +21,20 @@ export function PedidoDetailModal({
   pedido,
   cliente,
   productos,
+  savingEstadoPedido = false,
   onClose,
   onChanged,
+  onCambiarEstado,
   onDelete,
   onEdit,
 }: {
   pedido: Pedido | null;
   cliente?: Cliente;
   productos: Producto[];
+  savingEstadoPedido?: boolean;
   onClose: () => void;
   onChanged: () => void | Promise<void>;
+  onCambiarEstado: (pedidoId: number, estado: string, cobrar: boolean) => Promise<void>;
   onDelete: (pedido: Pedido) => void;
   onEdit: (pedido: Pedido) => void;
 }) {
@@ -67,6 +71,7 @@ export function PedidoDetailModal({
   const costoTotal = toNumber(pedido.costoTotal);
   const ganancia = toNumber(pedido.ganancia);
   const saldado = resta <= 0;
+  const bloqueado = savingEstado || savingEstadoPedido;
   const nombreCliente = pedido.cliente?.nombre ?? cliente?.nombre ?? `#${pedido.clienteId}`;
 
   async function guardarEstado(estado: string, cobrar: boolean) {
@@ -74,9 +79,7 @@ export function PedidoDetailModal({
     setSavingEstado(true);
     setError(null);
     try {
-      if (cobrar) await api.post(`/pedidos/${pedido.id}/pagos`);
-      await api.patch(`/pedidos/${pedido.id}`, { estado });
-      await onChanged();
+      await onCambiarEstado(pedido.id, estado, cobrar);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -176,7 +179,7 @@ export function PedidoDetailModal({
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="max-w-xs">
             <Field label="Estado" htmlFor="detail-estado">
-              <Select id="detail-estado" value={pedido.estado} disabled={savingEstado} onChange={(e) => changeEstado(e.target.value)}>
+              <Select id="detail-estado" value={pedido.estado} disabled={bloqueado} onChange={(e) => changeEstado(e.target.value)}>
                 {ESTADOS_PEDIDO.map((e) => (
                   <option key={e.value} value={e.value}>
                     {e.label}
@@ -235,10 +238,10 @@ export function PedidoDetailModal({
                 <Badge tone="success">Saldado</Badge>
               ) : (
                 <>
-                  <Button variant="secondary" size="sm" disabled={savingEstado} onClick={abrirPago}>
+                  <Button variant="secondary" size="sm" disabled={bloqueado} onClick={abrirPago}>
                     Registrar pago
                   </Button>
-                  <Button size="sm" disabled={savingEstado} onClick={() => setConfirmPagar(true)}>
+                  <Button size="sm" disabled={bloqueado} onClick={() => setConfirmPagar(true)}>
                     Marcar como pagado
                   </Button>
                 </>
@@ -410,7 +413,7 @@ export function PedidoDetailModal({
         onConfirm={() => confirmarCobro(true)}
         onSecondary={() => confirmarCobro(false)}
         onCancel={() => setConfirmCobro(false)}
-        loading={savingEstado}
+        loading={bloqueado}
       />
 
       <ConfirmDialog
@@ -421,7 +424,7 @@ export function PedidoDetailModal({
         confirmVariant="primary"
         onConfirm={() => void marcarComoPagado()}
         onCancel={() => setConfirmPagar(false)}
-        loading={savingEstado}
+        loading={bloqueado}
       />
 
       <ConfirmDialog

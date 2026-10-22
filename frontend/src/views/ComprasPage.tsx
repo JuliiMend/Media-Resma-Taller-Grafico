@@ -294,7 +294,7 @@ export function ComprasPage() {
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={`Cantidad *${selected ? ` (${selected.unidad})` : ""}`} htmlFor="c-cantidad">
-              <Input id="c-cantidad" type="number" required min="0" step="0.01" value={form.cantidad} onChange={(e) => setForm((f) => ({ ...f, cantidad: e.target.value }))} />
+              <Input id="c-cantidad" type="number" required min="0" step="0.01" inputMode="decimal" value={form.cantidad} onChange={(e) => setForm((f) => ({ ...f, cantidad: e.target.value }))} className="min-w-[7rem] text-right tabular-nums" />
             </Field>
             <Field label="Precio total *" htmlFor="c-precio" hint={unitario !== null ? `Equivale a ${formatMoney(unitario)} por unidad` : undefined}>
               <Input id="c-precio" type="number" required min="0" step="0.01" value={form.precio} onChange={(e) => setForm((f) => ({ ...f, precio: e.target.value }))} />

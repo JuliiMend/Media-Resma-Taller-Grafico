@@ -51,7 +51,7 @@ export function useUrlSort(defaultSort: SortState) {
     (next: SortState | null) => {
       const value = next ?? defaultSort;
       const clean = value.key === defaultSort.key && value.dir === defaultSort.dir;
-      update({ orden: clean ? null : value.key, dir: clean ? null : value.dir });
+      update({ orden: clean ? null : value.key, dir: clean ? null : value.dir, page: null });
     },
     [defaultSort, update],
   );

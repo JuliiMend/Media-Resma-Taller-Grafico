@@ -31,14 +31,22 @@ function dibujarEncabezado(doc: JsPdfDoc, datos: DatosPresupuestoPdf, logoDataUr
   const bordeDerecho = PAGE.width - MARGEN.right;
   let y = MARGEN.top;
 
+  let logoDibujado = false;
   if (logoDataUrl) {
     try {
       const props = doc.getImageProperties(logoDataUrl);
       const ratio = props.width > 0 && props.height > 0 ? props.height / props.width : 0.3;
       doc.addImage(logoDataUrl, "PNG", MARGEN.left, y, LOGO_ANCHO_MM, LOGO_ANCHO_MM * ratio, undefined, "FAST");
+      logoDibujado = true;
     } catch {
-      // Si el logo no se puede leer se sigue con el presupuesto sin él.
+      // Si el logo no se puede leer se usa el nombre como respaldo.
     }
+  }
+  if (!logoDibujado) {
+    doc.setFont(FUENTE, "bold");
+    doc.setFontSize(16);
+    doc.setTextColor(...TEXTO);
+    doc.text("MEDIA RESMA", MARGEN.left, y + 10);
   }
 
   doc.setFont(FUENTE, "bold");

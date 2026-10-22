@@ -199,8 +199,11 @@ export function PedidoFormModal({
           <fieldset className="flex flex-col gap-3">
             <legend className="mb-2 text-sm font-semibold">Trabajos</legend>
             {lineas.map((l, idx) => (
-              <div key={l.key} className="grid gap-3 rounded-lg border border-line bg-background/50 p-3 sm:grid-cols-12 sm:items-end">
-                <div className="sm:col-span-4">
+              <div
+                key={l.key}
+                className="grid gap-3 rounded-lg border border-line bg-background/50 p-3 sm:grid-cols-2 lg:grid-cols-[minmax(10rem,1.5fr)_minmax(10rem,1.5fr)_7rem_9rem_2.5rem] lg:items-end"
+              >
+                <div className="min-w-0">
                   <Field label="Producto" htmlFor={`l-prod-${l.key}`}>
                     <SearchSelect
                       id={`l-prod-${l.key}`}
@@ -218,22 +221,39 @@ export function PedidoFormModal({
                     />
                   </Field>
                 </div>
-                <div className="sm:col-span-4">
+                <div className="min-w-0">
                   <Field label="Descripción" htmlFor={`l-desc-${l.key}`}>
                     <Input id={`l-desc-${l.key}`} value={l.descripcion} onChange={(e) => updateLinea(l.key, { descripcion: e.target.value })} />
                   </Field>
                 </div>
-                <div className="sm:col-span-1">
+                <div className="min-w-0">
                   <Field label="Cant." htmlFor={`l-cant-${l.key}`}>
-                    <Input id={`l-cant-${l.key}`} type="number" min={0} step="any" inputMode="decimal" value={l.cantidad} onChange={(e) => updateLinea(l.key, { cantidad: e.target.value })} />
+                    <Input
+                      id={`l-cant-${l.key}`}
+                      type="number"
+                      min={0}
+                      step="any"
+                      inputMode="decimal"
+                      value={l.cantidad}
+                      onChange={(e) => updateLinea(l.key, { cantidad: e.target.value })}
+                      className="min-w-[7rem] text-right tabular-nums"
+                    />
                   </Field>
                 </div>
-                <div className="sm:col-span-2">
+                <div className="min-w-0">
                   <Field label="Valor unit." htmlFor={`l-val-${l.key}`}>
-                    <Input id={`l-val-${l.key}`} type="number" min={0} step="0.01" value={l.valorUnitario} onChange={(e) => updateLinea(l.key, { valorUnitario: e.target.value })} />
+                    <Input
+                      id={`l-val-${l.key}`}
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={l.valorUnitario}
+                      onChange={(e) => updateLinea(l.key, { valorUnitario: e.target.value })}
+                      className="text-right tabular-nums"
+                    />
                   </Field>
                 </div>
-                <div className="flex justify-end sm:col-span-1">
+                <div className="flex justify-end lg:justify-self-end">
                   <Button
                     type="button"
                     variant="ghost"

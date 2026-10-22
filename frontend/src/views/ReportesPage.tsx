@@ -3,6 +3,7 @@ import useSWR from "swr";
 import { fetcher, getErrorMessage } from "@/api/client";
 import { EmptyState, ErrorBanner, Field, Input, LoadingState, PageHeader, Select } from "@/components/ui";
 import { cn, formatMoney, toNumber } from "@/lib/format";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import type { FilaVenta, Producto } from "@/types";
 
 const numFormatter = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 });
@@ -47,6 +48,8 @@ export function ReportesPage() {
   const [desde, setDesde] = useState(haceSeisMesesISO);
   const [hasta, setHasta] = useState(hoyISO);
   const [productoId, setProductoId] = useState("");
+  const [qInput, setQInput] = useState("");
+  const q = useDebouncedValue(qInput, 300).trim();
 
   const { data: productos } = useSWR<Producto[]>("/productos", fetcher);
 
@@ -55,9 +58,10 @@ export function ReportesPage() {
     if (desde) params.set("desde", desde);
     if (hasta) params.set("hasta", hasta);
     if (productoId) params.set("productoId", productoId);
+    if (q) params.set("q", q);
     const query = params.toString();
     return query ? `/reportes/ventas?${query}` : "/reportes/ventas";
-  }, [desde, hasta, productoId]);
+  }, [desde, hasta, productoId, q]);
 
   const { data: filas, error, isLoading, mutate } = useSWR<FilaVenta[]>(key, fetcher);
 
@@ -108,6 +112,15 @@ export function ReportesPage() {
             ))}
           </Select>
         </Field>
+        <Field label="Buscar trabajo o producto" htmlFor="rep-q">
+          <Input
+            id="rep-q"
+            value={qInput}
+            onChange={(e) => setQInput(e.target.value)}
+            placeholder="Ej. tarjetitas doradas"
+            className="w-64"
+          />
+        </Field>
       </div>
 
       {isLoading ? (
@@ -117,7 +130,7 @@ export function ReportesPage() {
       ) : !filas || filas.length === 0 ? (
         <EmptyState
           title="No hay ventas en el período"
-          description="Ajustá las fechas o el filtro de producto para ver datos."
+          description="Ajustá las fechas, el producto o la búsqueda para ver datos."
         />
       ) : (
         <>
