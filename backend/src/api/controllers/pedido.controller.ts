@@ -17,15 +17,21 @@ const crud = createCrudController(
 export const pedidoController = {
   ...crud,
   listar: asyncHandler(async (req: Request, res: Response) => {
+    const productoRaw = Number(req.query.productoId);
+    const productoId =
+      req.query.productoId !== undefined && Number.isInteger(productoRaw) && productoRaw > 0
+        ? productoRaw
+        : undefined;
+
     if (req.query.page === undefined) {
-      res.json(await pedidoService.listar());
+      res.json(await pedidoService.listar(productoId));
       return;
     }
 
     const page = Math.max(1, Math.trunc(Number(req.query.page)) || 1);
     const requestedSize = Math.trunc(Number(req.query.pageSize)) || 25;
     const pageSize = Math.min(100, Math.max(1, requestedSize));
-    res.json(await pedidoService.listarPaginado(page, pageSize));
+    res.json(await pedidoService.listarPaginado(page, pageSize, productoId));
   }),
   pagar: asyncHandler(async (req: Request, res: Response) => {
     const { monto } = pagoPedidoSchema.parse(req.body ?? {});

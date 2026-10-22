@@ -12,10 +12,12 @@ import { PedidoFormModal } from "./PedidoFormModal";
 import { PedidosTab } from "./PedidosTab";
 
 export function PedidosPage() {
-  const { data: pedidos, error, isLoading, mutate } = useSWR<Pedido[]>("/pedidos", fetcher);
+  const [params, setParams] = useSearchParams();
+  const productoIdParam = params.get("productoId") ?? "";
+  const pedidosKey = productoIdParam ? `/pedidos?productoId=${productoIdParam}` : "/pedidos";
+  const { data: pedidos, error, isLoading, mutate } = useSWR<Pedido[]>(pedidosKey, fetcher);
   const { data: clientes } = useSWR<Cliente[]>("/clientes", fetcher);
   const { data: productos } = useSWR<Producto[]>("/productos", fetcher);
-  const [params, setParams] = useSearchParams();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Pedido | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -127,7 +129,12 @@ export function PedidosPage() {
           onChanged={() => void mutate()}
         />
       ) : (
-        <PedidosTab pedidos={list} clientesById={clientesById} onOpen={(p) => setSelectedId(p.id)} />
+        <PedidosTab
+          pedidos={list}
+          clientesById={clientesById}
+          productos={productos ?? []}
+          onOpen={(p) => setSelectedId(p.id)}
+        />
       )}
 
       <PedidoFormModal

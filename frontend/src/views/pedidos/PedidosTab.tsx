@@ -3,8 +3,9 @@ import { cn, formatDate, formatMoney, toDateInput, toNumber } from "@/lib/format
 import { sortItems, type SortType } from "@/lib/sort";
 import { useUrlParams, useUrlSort } from "@/lib/url-state";
 import { Badge, Button, EmptyState, Field, Input, Select } from "@/components/ui";
+import { SearchSelect } from "@/components/SearchSelect";
 import { SortControl, SortableHeader } from "@/components/SortableHeader";
-import type { Cliente, Pedido } from "@/types";
+import type { Cliente, Pedido, Producto } from "@/types";
 import { ESTADOS_PEDIDO, estadoInfo } from "./estados";
 
 const ESTADOS_VALUES: string[] = ESTADOS_PEDIDO.map((e) => e.value);
@@ -53,15 +54,18 @@ const esDefault = (list: string[]) =>
 export function PedidosTab({
   pedidos,
   clientesById,
+  productos,
   onOpen,
 }: {
   pedidos: Pedido[];
   clientesById: Map<number, Cliente>;
+  productos: Producto[];
   onOpen: (pedido: Pedido) => void;
 }) {
   const { params, update } = useUrlParams();
   const estadosParam = params.get("estados") ?? "";
   const clienteId = params.get("cliente") ?? "";
+  const productoId = params.get("productoId") ?? "";
   const desde = params.get("desde") ?? "";
   const hasta = params.get("hasta") ?? "";
   const soloDeuda = params.get("deuda") === "1";
@@ -70,7 +74,13 @@ export function PedidosTab({
 
   const estadosActivos = resolveEstados(estadosParam);
   const filterCount =
-    (estadosParam ? 1 : 0) + (clienteId ? 1 : 0) + (desde ? 1 : 0) + (hasta ? 1 : 0) + (soloDeuda ? 1 : 0) + (entrega7 ? 1 : 0);
+    (estadosParam ? 1 : 0) +
+    (clienteId ? 1 : 0) +
+    (productoId ? 1 : 0) +
+    (desde ? 1 : 0) +
+    (hasta ? 1 : 0) +
+    (soloDeuda ? 1 : 0) +
+    (entrega7 ? 1 : 0);
 
   const hoy = new Date().toISOString().slice(0, 10);
   const limite7 = addDaysIso(hoy, 7);
@@ -104,6 +114,11 @@ export function PedidosTab({
     [clientesById],
   );
 
+  const productoOptions = useMemo(
+    () => productos.map((p) => ({ value: String(p.id), label: p.nombre })),
+    [productos],
+  );
+
   const activos = pedidos.filter((p) => p.estado !== "ENTREGADO" && p.estado !== "CANCELADO").length;
   const saldoPendiente = pedidos.filter((p) => p.estado !== "CANCELADO").reduce((s, p) => s + toNumber(p.restaPagar), 0);
 
@@ -120,7 +135,7 @@ export function PedidosTab({
   }
 
   function clearAllFilters() {
-    update({ estados: null, cliente: null, desde: null, hasta: null, deuda: null, entrega7: null });
+    update({ estados: null, cliente: null, productoId: null, desde: null, hasta: null, deuda: null, entrega7: null });
   }
 
   const toggleClass = (active: boolean) =>
@@ -194,6 +209,19 @@ export function PedidosTab({
               </option>
             ))}
           </Select>
+        </Field>
+        <Field label="Producto" htmlFor="pedidos-producto">
+          <div className="w-52">
+            <SearchSelect
+              id="pedidos-producto"
+              options={productoOptions}
+              value={productoId}
+              onChange={(value) => update({ productoId: value })}
+              placeholder="Buscar producto…"
+              emptyLabel="Todos los productos"
+              clearable
+            />
+          </div>
         </Field>
         <Field label="Desde" htmlFor="pedidos-desde">
           <Input id="pedidos-desde" type="date" value={desde} max={hasta || undefined} onChange={(e) => update({ desde: e.target.value })} className="w-40" />

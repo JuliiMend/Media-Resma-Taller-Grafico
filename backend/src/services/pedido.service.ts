@@ -70,10 +70,11 @@ const describirCantidadTrabajos = (cantidad: number) =>
   `${cantidad} ${cantidad === 1 ? "trabajo" : "trabajos"}`;
 
 export const pedidoService = {
-  listar: async () => (await pedidoRepository.findAll()).map(conTotales),
+  listar: async (productoId?: number) =>
+    (await pedidoRepository.findAll(productoId)).map(conTotales),
 
-  listarPaginado: async (page: number, pageSize: number) => {
-    const { data, total } = await pedidoRepository.findAllPaginated(page, pageSize);
+  listarPaginado: async (page: number, pageSize: number, productoId?: number) => {
+    const { data, total } = await pedidoRepository.findAllPaginated(page, pageSize, productoId);
     return {
       data: data.map(conTotales),
       total,

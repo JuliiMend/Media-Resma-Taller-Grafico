@@ -233,13 +233,18 @@ export function Modal({
       ref={ref}
       aria-labelledby={titleId}
       onCancel={(e) => {
-        // Escape cierra únicamente el modal superior.
+        // Escape cierra únicamente el modal superior de la pila.
         e.preventDefault();
-        if (isTopModal(modalId)) onClose();
+        if (!isTopModal(modalId)) return;
+        onClose();
       }}
       onClick={(e) => {
+        // Un click dentro de un modal hijo nunca debe llegar a este handler.
         e.stopPropagation();
-        if (e.target === e.currentTarget && isTopModal(modalId)) onClose();
+        // Cerrar solo si el click fue directo sobre el backdrop del propio dialog.
+        if (e.target !== e.currentTarget) return;
+        if (!isTopModal(modalId)) return;
+        onClose();
       }}
       className={cn(
         "m-auto w-[calc(100%-2rem)] rounded-2xl border border-line bg-surface p-0 text-ink shadow-2xl",

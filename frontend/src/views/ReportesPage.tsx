@@ -71,12 +71,6 @@ export function ReportesPage() {
     return Array.from(mapa.entries()).sort((a, b) => b[0].localeCompare(a[0]));
   }, [filas]);
 
-  const paraGrafico = useMemo(() => {
-    const meses = [...porMes].reverse();
-    const max = Math.max(...meses.map(([, rows]) => acumular(rows).cantidad), 1);
-    return { meses, max };
-  }, [porMes]);
-
   const totales = filas ? acumular(filas) : null;
 
   return (
@@ -148,27 +142,6 @@ export function ReportesPage() {
             </div>
           )}
 
-          <section aria-labelledby="grafico-title" className="mb-8">
-            <h2 id="grafico-title" className="mb-3 text-sm font-semibold">
-              Cantidad por mes
-            </h2>
-            <div className="flex h-52 items-stretch gap-2 overflow-x-auto rounded-xl border border-line bg-surface p-4">
-              {paraGrafico.meses.map(([mes, rows]) => {
-                const cantidad = acumular(rows).cantidad;
-                const pct = Math.max((cantidad / paraGrafico.max) * 100, 2);
-                return (
-                  <div key={mes} className="flex h-full min-w-14 flex-1 flex-col items-center gap-1" title={`${labelMes(mes)}: ${numFormatter.format(cantidad)}`}>
-                    <span className="text-[10px] tabular-nums text-muted">{numFormatter.format(cantidad)}</span>
-                    <div className="flex w-full flex-1 items-end">
-                      <div className="w-full rounded-t bg-primary/80 transition-all" style={{ height: `${pct}%` }} />
-                    </div>
-                    <span className="whitespace-nowrap text-[10px] text-muted">{labelMes(mes)}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-
           <div className="flex flex-col gap-6">
             {porMes.map(([mes, rows]) => {
               const mesTotales = acumular(rows);
@@ -209,7 +182,7 @@ export function ReportesPage() {
                       <tfoot className="border-t border-line bg-background/40 font-semibold">
                         <tr>
                           <td className="px-4 py-2.5 text-right">Total {labelMes(mes)}</td>
-                          <td className="px-4 py-2.5 text-right tabular-nums">{numFormatter.format(mesTotales.cantidad)}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums" />
                           <td className="px-4 py-2.5 text-right tabular-nums">{formatMoney(mesTotales.ingresos)}</td>
                           <td className="px-4 py-2.5 text-right tabular-nums">{formatMoney(mesTotales.costo)}</td>
                           <td className={cn("px-4 py-2.5 text-right tabular-nums", mesTotales.ganancia < 0 && "text-danger")}>

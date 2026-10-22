@@ -1,17 +1,25 @@
 import { prisma } from "../config/db";
 import { CrearPedidoInput, ActualizarPedidoInput } from "@/schemas/pedido.schema";
 
+const wherePorProducto = (productoId?: number) =>
+    productoId !== undefined
+        ? { trabajos: { some: { productoId } } }
+        : {};
+
 export const pedidoRepository = {
-    findAll: () =>
+    findAll: (productoId?: number) =>
         prisma.pedido.findMany({
+            where: wherePorProducto(productoId),
             orderBy: { fecha: "desc" },
             include: { cliente: true, trabajos: true },
         }),
 
-    findAllPaginated: async (page: number, pageSize: number) => {
+    findAllPaginated: async (page: number, pageSize: number, productoId?: number) => {
+        const where = wherePorProducto(productoId);
         const [total, data] = await prisma.$transaction([
-            prisma.pedido.count(),
+            prisma.pedido.count({ where }),
             prisma.pedido.findMany({
+                where,
                 orderBy: { fecha: "desc" },
                 skip: (page - 1) * pageSize,
                 take: pageSize,
