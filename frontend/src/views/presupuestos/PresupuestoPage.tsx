@@ -177,6 +177,8 @@ export function PresupuestoPage() {
   const [productoModal, setProductoModal] = useState(false);
   const [lineaProducto, setLineaProducto] = useState<string | null>(null);
   const [crearClienteParaPedido, setCrearClienteParaPedido] = useState(false);
+  const [clienteRecienCreado, setClienteRecienCreado] = useState<Cliente | null>(null);
+  const [productosRecienCreados, setProductosRecienCreados] = useState<Producto[]>([]);
 
   const [puedeCompartir] = useState(detectarSoporteCompartir);
   const avisoCopiado = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -221,8 +223,15 @@ export function PresupuestoPage() {
   const lineas = useMemo(() => resumenLineas(borrador), [borrador]);
   const items = lineasValidas(borrador.lineas);
 
-  const clientesActivos = useMemo(() => (clientes ?? []).filter((c) => c.activo !== false), [clientes]);
-  const productosActivos = useMemo(() => (productos ?? []).filter((p) => p.activo), [productos]);
+  const clientesActivos = useMemo(() => {
+    const base = (clientes ?? []).filter((c) => c.activo !== false);
+    return clienteRecienCreado && !base.some((c) => c.id === clienteRecienCreado.id) ? [...base, clienteRecienCreado] : base;
+  }, [clientes, clienteRecienCreado]);
+  const productosActivos = useMemo(() => {
+    const base = (productos ?? []).filter((p) => p.activo);
+    const creados = productosRecienCreados.filter((p) => p.activo && !base.some((b) => b.id === p.id));
+    return creados.length ? [...base, ...creados] : base;
+  }, [productos, productosRecienCreados]);
   const clienteOptions = clientesActivos.map((c) => ({ value: String(c.id), label: c.nombre }));
   const productoOptions = productosActivos.map((p) => ({ value: String(p.id), label: p.nombre }));
 
@@ -303,6 +312,7 @@ export function PresupuestoPage() {
   }
 
   function productoCreado(producto: Producto) {
+    setProductosRecienCreados((actual) => (actual.some((p) => p.id === producto.id) ? actual : [...actual, producto]));
     if (lineaProducto) {
       patchLinea(lineaProducto, {
         productoId: producto.id,
@@ -319,6 +329,7 @@ export function PresupuestoPage() {
   }
 
   function clienteCreado(cliente: Cliente) {
+    setClienteRecienCreado(cliente);
     setClienteModal(false);
     patchBorrador({
       modoCliente: "existente",

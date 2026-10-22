@@ -3,7 +3,7 @@ import { api, getErrorMessage } from "@/api/client";
 import { Button, ErrorBanner, Field, Input, Modal } from "@/components/ui";
 import { SearchSelect } from "@/components/SearchSelect";
 import { ProductoQuickModal } from "@/components/QuickCreate";
-import { toNumber } from "@/lib/format";
+import { cn, formatMoney, toNumber } from "@/lib/format";
 import type { Producto, Trabajo } from "@/types";
 
 export function TrabajoFormModal({
@@ -29,9 +29,14 @@ export function TrabajoFormModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [productoModal, setProductoModal] = useState(false);
+  const [productosCreados, setProductosCreados] = useState<Producto[]>([]);
 
   const editando = Boolean(trabajo);
-  const productosActivos = productos.filter((p) => p.activo || String(p.id) === productoId);
+  const productosConCreados = [
+    ...productos,
+    ...productosCreados.filter((p) => !productos.some((base) => base.id === p.id)),
+  ];
+  const productosActivos = productosConCreados.filter((p) => p.activo || String(p.id) === productoId);
   const productoOptions = productosActivos.map((p) => ({ value: String(p.id), label: p.nombre }));
 
   useEffect(() => {
@@ -46,7 +51,7 @@ export function TrabajoFormModal({
 
   function selectProducto(value: string) {
     setProductoId(value);
-    const producto = productos.find((p) => String(p.id) === value);
+    const producto = productosConCreados.find((p) => String(p.id) === value);
     if (!producto) return;
     setDescripcion(producto.nombre);
     setValorUnitario(String(toNumber(producto.precioVenta)));
@@ -54,12 +59,15 @@ export function TrabajoFormModal({
   }
 
   function productoCreado(producto: Producto) {
+    setProductosCreados((actual) => (actual.some((p) => p.id === producto.id) ? actual : [...actual, producto]));
     setProductoId(String(producto.id));
     setDescripcion(producto.nombre);
     setValorUnitario(producto.precioVenta === null || producto.precioVenta === undefined ? "" : String(toNumber(producto.precioVenta)));
     setCosto(producto.costo === null || producto.costo === undefined ? "" : String(toNumber(producto.costo)));
     setProductoModal(false);
   }
+
+  const ganancia = (toNumber(valorUnitario) - toNumber(costo)) * toNumber(cantidad);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -114,9 +122,27 @@ export function TrabajoFormModal({
             <Input id="t-valor" type="number" min={0} step="0.01" value={valorUnitario} onChange={(e) => setValorUnitario(e.target.value)} />
           </Field>
           <Field label="Costo unitario" htmlFor="t-costo">
-            <Input id="t-costo" type="number" min={0} step="0.01" value={costo} onChange={(e) => setCosto(e.target.value)} placeholder="Sin costo" />
+            <Input
+              id="t-costo"
+              type="number"
+              min={0}
+              step="any"
+              inputMode="decimal"
+              value={costo}
+              onChange={(e) => setCosto(e.target.value)}
+              placeholder="Costo (opcional)"
+              className="text-right tabular-nums"
+            />
           </Field>
         </div>
+        <p
+          className={cn(
+            "text-right text-xs font-medium tabular-nums",
+            costo === "" ? "text-muted" : ganancia >= 0 ? "text-success" : "text-danger",
+          )}
+        >
+          Ganancia estimada: {costo === "" ? "—" : formatMoney(ganancia)}
+        </p>
         {error && <ErrorBanner message={error} />}
         <div className="flex justify-end gap-2 pt-1">
           <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>

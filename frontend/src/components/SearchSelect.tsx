@@ -46,6 +46,7 @@ export function SearchSelect({
   const listId = useId();
   const wrapRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const ignoreNextFocus = useRef(false);
 
   const selectedLabel = options.find((o) => o.value === value)?.label ?? "";
   const displayValue = open ? query : selectedLabel || emptyLabel || "";
@@ -60,8 +61,17 @@ export function SearchSelect({
 
   useEffect(() => {
     if (!open) return;
-    const el = listRef.current?.querySelector('[data-active="true"]');
-    el?.scrollIntoView({ block: "nearest" });
+    const list = listRef.current;
+    const el = list?.querySelector<HTMLElement>('[data-active="true"]');
+    if (!list || !el) return;
+    // Mover solo el scroll interno de la lista, nunca el del modal.
+    const listRect = list.getBoundingClientRect();
+    const itemRect = el.getBoundingClientRect();
+    if (itemRect.top < listRect.top) {
+      list.scrollTop -= listRect.top - itemRect.top;
+    } else if (itemRect.bottom > listRect.bottom) {
+      list.scrollTop += itemRect.bottom - listRect.bottom;
+    }
   }, [open, safeActive]);
 
   useEffect(() => {
@@ -87,6 +97,8 @@ export function SearchSelect({
   }
 
   function handleCreate() {
+    // El modal hijo devuelve el foco al input al cerrarse: evitar que reabra el desplegable.
+    ignoreNextFocus.current = true;
     close();
     onCreate?.();
   }
@@ -153,7 +165,20 @@ export function SearchSelect({
           setActiveIndex(0);
           if (!open) setOpen(true);
         }}
+        onPointerDown={() => {
+          ignoreNextFocus.current = false;
+        }}
+        onClick={() => {
+          if (disabled || open) return;
+          setQuery("");
+          setActiveIndex(0);
+          setOpen(true);
+        }}
         onFocus={() => {
+          if (ignoreNextFocus.current) {
+            ignoreNextFocus.current = false;
+            return;
+          }
           setQuery("");
           setActiveIndex(0);
           setOpen(true);
@@ -174,60 +199,63 @@ export function SearchSelect({
       )}
 
       {open && (
-        <ul
-          ref={listRef}
+        <div
           id={listId}
           role="listbox"
           aria-label={placeholder ?? "Opciones"}
-          className="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-y-auto rounded-xl border border-line bg-surface py-1 shadow-xl"
+          className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-xl border border-line bg-surface shadow-xl"
         >
-      {filtered.map((option, index) => {
-        const realIndex = firstOptionIndex + index;
-        const active = realIndex === safeActive;
-        return (
-          <li
-            key={option.value}
-            id={`${listId}-${realIndex}`}
-            role="option"
-            aria-selected={option.value === value}
-            data-active={active}
-            onMouseDown={(e) => e.preventDefault()}
-            onMouseEnter={() => setActiveIndex(realIndex)}
-            onClick={() => select(option.value)}
-            className={cn(
-              "cursor-pointer px-3 py-2 text-sm",
-              active && "bg-ink/10",
-              option.value === value && "font-semibold text-primary",
-            )}
-          >
-            {option.label}
-          </li>
-        );
-      })}
-
-      {filtered.length === 0 && !showCreate && (
-        <li className="px-3 py-2 text-sm text-muted">Sin resultados</li>
-      )}
-
-      {showCreate && (
-        <li
-          id={`${listId}-0`}
-          role="option"
-          aria-selected={false}
-          data-active={safeActive === 0}
-          onMouseDown={(e) => e.preventDefault()}
-          onMouseEnter={() => setActiveIndex(0)}
-          onClick={handleCreate}
-          className={cn(
-            "flex cursor-pointer items-center gap-2 border-b border-line px-3 py-2 text-sm font-semibold text-primary",
-            safeActive === 0 && "bg-primary-soft",
+          {showCreate && (
+            <div
+              id={`${listId}-0`}
+              role="option"
+              aria-selected={false}
+              data-active={safeActive === 0}
+              onMouseDown={(e) => e.preventDefault()}
+              onMouseEnter={() => setActiveIndex(0)}
+              onClick={handleCreate}
+              className={cn(
+                "flex cursor-pointer items-center gap-2 border-b border-line px-3 py-2 text-sm font-semibold text-primary",
+                safeActive === 0 && "bg-primary-soft",
+              )}
+            >
+              <Plus className="size-4" aria-hidden="true" />
+              {createLabel}
+            </div>
           )}
-        >
-          <Plus className="size-4" aria-hidden="true" />
-          {createLabel}
-        </li>
-      )}
-        </ul>
+
+          <ul ref={listRef} role="presentation" className="max-h-60 overflow-y-auto py-1">
+            {filtered.map((option, index) => {
+              const realIndex = firstOptionIndex + index;
+              const active = realIndex === safeActive;
+              return (
+                <li
+                  key={option.value}
+                  id={`${listId}-${realIndex}`}
+                  role="option"
+                  aria-selected={option.value === value}
+                  data-active={active}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onMouseEnter={() => setActiveIndex(realIndex)}
+                  onClick={() => select(option.value)}
+                  className={cn(
+                    "cursor-pointer px-3 py-2 text-sm",
+                    active && "bg-ink/10",
+                    option.value === value && "font-semibold text-primary",
+                  )}
+                >
+                  {option.label}
+                </li>
+              );
+            })}
+
+            {filtered.length === 0 && !showCreate && (
+              <li role="presentation" className="px-3 py-2 text-sm text-muted">
+                Sin resultados
+              </li>
+            )}
+          </ul>
+        </div>
       )}
     </div>
   );

@@ -4,7 +4,7 @@ import { api, getErrorMessage } from "@/api/client";
 import { Button, ErrorBanner, Field, Input, Modal, Select, Textarea } from "@/components/ui";
 import { UNIDADES_PRODUCTO } from "@/lib/unidades";
 import { useRegistrarHistorial } from "@/lib/useHistorial";
-import type { Cliente, Producto, TipoProducto } from "@/types";
+import type { Cliente, Insumo, Producto, TipoProducto } from "@/types";
 
 export function ClienteQuickModal({
   open,
@@ -184,6 +184,102 @@ export function ProductoQuickModal({
           </Button>
           <Button type="submit" loading={saving}>
             Crear producto
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+export function InsumoQuickModal({
+  open,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreated: (insumo: Insumo) => void;
+}) {
+  const registrar = useRegistrarHistorial();
+  const [nombre, setNombre] = useState("");
+  const [unidad, setUnidad] = useState<string>("u");
+  const [stockMinimo, setStockMinimo] = useState("");
+  const [precioUnitario, setPrecioUnitario] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setNombre("");
+      setUnidad("u");
+      setStockMinimo("");
+      setPrecioUnitario("");
+      setError(null);
+    }
+  }, [open]);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!nombre.trim()) return setError("Completá el nombre");
+    setSaving(true);
+    setError(null);
+    try {
+      const payload: Record<string, unknown> = {
+        nombre: nombre.trim(),
+        unidad,
+        stockActual: 0,
+        stockMinimo: stockMinimo === "" ? 0 : Number(stockMinimo),
+        precioUnitario: precioUnitario === "" ? 0 : Number(precioUnitario),
+        activo: true,
+      };
+      const { data } = await api.post<Insumo>("/insumos", payload);
+      await mutate("/insumos");
+      void registrar("CREAR", "insumo", data.id, `Creó insumo "${data.nombre}"`);
+      onCreated(data);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Nuevo insumo">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <Field label="Nombre *" htmlFor="qc-insumo-nombre">
+          <Input id="qc-insumo-nombre" autoFocus value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre del insumo" />
+        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Unidad" htmlFor="qc-insumo-unidad">
+            <Select id="qc-insumo-unidad" value={unidad} onChange={(e) => setUnidad(e.target.value)}>
+              {UNIDADES_PRODUCTO.map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Stock mínimo" htmlFor="qc-insumo-minimo">
+            <Input id="qc-insumo-minimo" type="number" min={0} step="any" inputMode="decimal" value={stockMinimo} onChange={(e) => setStockMinimo(e.target.value)} />
+          </Field>
+          <Field label="Precio unitario" htmlFor="qc-insumo-precio">
+            <Input
+              id="qc-insumo-precio"
+              type="number"
+              min={0}
+              step="0.01"
+              value={precioUnitario}
+              onChange={(e) => setPrecioUnitario(e.target.value)}
+            />
+          </Field>
+        </div>
+        {error && <ErrorBanner message={error} />}
+        <div className="flex justify-end gap-2 pt-1">
+          <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button type="submit" loading={saving}>
+            Crear insumo
           </Button>
         </div>
       </form>

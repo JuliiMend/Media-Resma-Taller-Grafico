@@ -12,8 +12,9 @@ import {
   LoadingState,
   Modal,
   PageHeader,
-  Select,
 } from "@/components/ui";
+import { SearchSelect } from "@/components/SearchSelect";
+import { InsumoQuickModal } from "@/components/QuickCreate";
 import { formatDate, formatMoney, toNumber } from "@/lib/format";
 import { Pagination, clampPage, paginate } from "@/components/Pagination";
 import { MEDIOS_PAGO_SUGERIDOS } from "@/lib/medios-pago";
@@ -50,8 +51,18 @@ export function ComprasPage() {
   const [deleting, setDeleting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [insumoModal, setInsumoModal] = useState(false);
+  const [insumoCreado, setInsumoCreado] = useState<Insumo | null>(null);
 
-  const insumoById = useMemo(() => new Map((insumos.data ?? []).map((i) => [i.id, i])), [insumos.data]);
+  const insumosLista = useMemo(() => {
+    const data = insumos.data ?? [];
+    return insumoCreado && !data.some((i) => i.id === insumoCreado.id) ? [...data, insumoCreado] : data;
+  }, [insumos.data, insumoCreado]);
+  const insumoById = useMemo(() => new Map(insumosLista.map((i) => [i.id, i])), [insumosLista]);
+  const insumoOptions = insumosLista.map((i) => ({
+    value: String(i.id),
+    label: `${i.nombre} (${toNumber(i.stockActual)} ${i.unidad})`,
+  }));
   const lista = useMemo(
     () => [...(compras.data ?? [])].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime() || b.id - a.id),
     [compras.data],
@@ -282,15 +293,24 @@ export function ComprasPage() {
 
       <Modal open={formOpen} onClose={() => setFormOpen(false)} title="Nueva compra">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <Field label="Insumo *" htmlFor="c-insumo">
-            <Select id="c-insumo" required value={form.insumoId} onChange={(e) => setForm((f) => ({ ...f, insumoId: e.target.value }))}>
-              <option value="">Elegí un insumo…</option>
-              {(insumos.data ?? []).map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.nombre} ({toNumber(i.stockActual)} {i.unidad})
-                </option>
-              ))}
-            </Select>
+          <Field
+            label="Insumo *"
+            htmlFor="c-insumo"
+            hint={
+              selected
+                ? `Stock actual: ${toNumber(selected.stockActual)} ${selected.unidad} · Precio actual: ${formatMoney(selected.precioUnitario)} / ${selected.unidad}`
+                : undefined
+            }
+          >
+            <SearchSelect
+              id="c-insumo"
+              options={insumoOptions}
+              value={form.insumoId}
+              onChange={(value) => setForm((f) => ({ ...f, insumoId: value }))}
+              placeholder="Buscar insumo…"
+              createLabel="+ Crear insumo nuevo"
+              onCreate={() => setInsumoModal(true)}
+            />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={`Cantidad *${selected ? ` (${selected.unidad})` : ""}`} htmlFor="c-cantidad">
@@ -332,6 +352,17 @@ export function ComprasPage() {
           </div>
         </form>
       </Modal>
+
+      <InsumoQuickModal
+        open={insumoModal}
+        onClose={() => setInsumoModal(false)}
+        onCreated={(insumo) => {
+          setInsumoCreado(insumo);
+          setForm((f) => ({ ...f, insumoId: String(insumo.id) }));
+          setFormError(null);
+          setInsumoModal(false);
+        }}
+      />
 
       <ConfirmDialog
         open={toDelete !== null}

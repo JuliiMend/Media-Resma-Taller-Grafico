@@ -15,10 +15,18 @@ interface Linea {
   descripcion: string;
   cantidad: string;
   valorUnitario: string;
+  costoUnitario: string;
 }
 
 let lineaKey = 0;
-const nuevaLinea = (): Linea => ({ key: ++lineaKey, productoId: "", descripcion: "", cantidad: "1", valorUnitario: "" });
+const nuevaLinea = (): Linea => ({
+  key: ++lineaKey,
+  productoId: "",
+  descripcion: "",
+  cantidad: "1",
+  valorUnitario: "",
+  costoUnitario: "",
+});
 
 export function PedidoFormModal({
   open,
@@ -49,11 +57,19 @@ export function PedidoFormModal({
   const [clienteModal, setClienteModal] = useState(false);
   const [productoModal, setProductoModal] = useState(false);
   const [lineaProducto, setLineaProducto] = useState<number | null>(null);
+  const [clienteCreado, setClienteCreado] = useState<Cliente | null>(null);
+  const [productosCreados, setProductosCreados] = useState<Producto[]>([]);
 
   const editando = Boolean(pedido);
   const clientesActivos = clientes.filter((c) => c.activo !== false);
-  const productosActivos = productos.filter((p) => p.activo);
-  const clienteOptions = clientesActivos.map((c) => ({ value: String(c.id), label: c.nombre }));
+  const clientesConCreado =
+    clienteCreado && !clientesActivos.some((c) => c.id === clienteCreado.id) ? [...clientesActivos, clienteCreado] : clientesActivos;
+  const productosConCreados = [
+    ...productos,
+    ...productosCreados.filter((p) => !productos.some((base) => base.id === p.id)),
+  ];
+  const productosActivos = productosConCreados.filter((p) => p.activo);
+  const clienteOptions = clientesConCreado.map((c) => ({ value: String(c.id), label: c.nombre }));
   const productoOptions = productosActivos.map((p) => ({ value: String(p.id), label: p.nombre }));
 
   const subtotal = lineas.reduce((s, l) => s + toNumber(l.cantidad) * toNumber(l.valorUnitario), 0);
@@ -88,19 +104,27 @@ export function PedidoFormModal({
   }
 
   function selectProducto(key: number, productoId: string) {
-    const producto = productos.find((p) => String(p.id) === productoId);
+    const producto = productosConCreados.find((p) => String(p.id) === productoId);
     updateLinea(key, {
       productoId,
-      ...(producto && { descripcion: producto.nombre, valorUnitario: String(toNumber(producto.precioVenta)) }),
+      ...(producto
+        ? {
+            descripcion: producto.nombre,
+            valorUnitario: String(toNumber(producto.precioVenta)),
+            costoUnitario: producto.costo === null || producto.costo === undefined ? "" : String(toNumber(producto.costo)),
+          }
+        : { costoUnitario: "" }),
     });
   }
 
   function productoCreado(producto: Producto) {
+    setProductosCreados((actual) => (actual.some((p) => p.id === producto.id) ? actual : [...actual, producto]));
     if (lineaProducto !== null) {
       updateLinea(lineaProducto, {
         productoId: String(producto.id),
         descripcion: producto.nombre,
         valorUnitario: producto.precioVenta === null || producto.precioVenta === undefined ? "" : String(toNumber(producto.precioVenta)),
+        costoUnitario: producto.costo === null || producto.costo === undefined ? "" : String(toNumber(producto.costo)),
       });
     }
     setProductoModal(false);
@@ -153,6 +177,7 @@ export function PedidoFormModal({
           descripcion: l.descripcion.trim(),
           cantidad: toNumber(l.cantidad),
           valorUnitario: toNumber(l.valorUnitario),
+          costoUnitario: l.costoUnitario === "" ? null : toNumber(l.costoUnitario),
         })),
       });
       onCreated();
@@ -198,11 +223,11 @@ export function PedidoFormModal({
         {!editando && (
           <fieldset className="flex flex-col gap-3">
             <legend className="mb-2 text-sm font-semibold">Trabajos</legend>
-            {lineas.map((l, idx) => (
-              <div
-                key={l.key}
-                className="grid gap-3 rounded-lg border border-line bg-background/50 p-3 sm:grid-cols-2 lg:grid-cols-[minmax(10rem,1.5fr)_minmax(10rem,1.5fr)_7rem_9rem_2.5rem] lg:items-end"
-              >
+            {lineas.map((l, idx) => {
+              const gananciaLinea = (toNumber(l.valorUnitario) - toNumber(l.costoUnitario)) * toNumber(l.cantidad);
+              return (
+              <div key={l.key} className="rounded-lg border border-line bg-background/50 p-3">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(8rem,1.3fr)_minmax(8rem,1.3fr)_6.5rem_7rem_7rem_2.5rem] lg:items-end">
                 <div className="min-w-0">
                   <Field label="Producto" htmlFor={`l-prod-${l.key}`}>
                     <SearchSelect
@@ -236,7 +261,7 @@ export function PedidoFormModal({
                       inputMode="decimal"
                       value={l.cantidad}
                       onChange={(e) => updateLinea(l.key, { cantidad: e.target.value })}
-                      className="min-w-[7rem] text-right tabular-nums"
+                      className="min-w-0 text-right tabular-nums"
                     />
                   </Field>
                 </div>
@@ -253,6 +278,21 @@ export function PedidoFormModal({
                     />
                   </Field>
                 </div>
+                <div className="min-w-0">
+                  <Field label="Costo unit." htmlFor={`l-costo-${l.key}`}>
+                    <Input
+                      id={`l-costo-${l.key}`}
+                      type="number"
+                      min={0}
+                      step="any"
+                      inputMode="decimal"
+                      value={l.costoUnitario}
+                      onChange={(e) => updateLinea(l.key, { costoUnitario: e.target.value })}
+                      placeholder="Costo (opcional)"
+                      className="text-right tabular-nums"
+                    />
+                  </Field>
+                </div>
                 <div className="flex justify-end lg:justify-self-end">
                   <Button
                     type="button"
@@ -265,8 +305,18 @@ export function PedidoFormModal({
                     <Trash2 className="size-4" aria-hidden="true" />
                   </Button>
                 </div>
+                </div>
+                <p
+                  className={cn(
+                    "mt-2 text-right text-xs font-medium tabular-nums",
+                    l.costoUnitario === "" ? "text-muted" : gananciaLinea >= 0 ? "text-success" : "text-danger",
+                  )}
+                >
+                  Ganancia estimada: {l.costoUnitario === "" ? "—" : formatMoney(gananciaLinea)}
+                </p>
               </div>
-            ))}
+              );
+            })}
             <Button type="button" variant="secondary" size="sm" className="self-start" onClick={() => setLineas((ls) => [...ls, nuevaLinea()])}>
               <Plus className="size-4" aria-hidden="true" />
               Agregar trabajo
@@ -322,6 +372,7 @@ export function PedidoFormModal({
         open={clienteModal}
         onClose={() => setClienteModal(false)}
         onCreated={(cliente) => {
+          setClienteCreado(cliente);
           setClienteId(String(cliente.id));
           setClienteModal(false);
         }}
