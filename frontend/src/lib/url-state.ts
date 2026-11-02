@@ -39,6 +39,32 @@ export function useUrlParam(name: string): [string, (value: string) => void] {
  * Estado de orden (`orden`/`dir`) persistido en la URL. Al no haber parámetros
  * se usa `defaultSort`; `setSort(null)` vuelve al orden por defecto.
  */
+export function useUrlSortConPrefijo(prefijo: string, defaultSort: SortState) {
+  const { params, update } = useUrlParams();
+  const ordenKey = `${prefijo}orden`;
+  const dirKey = `${prefijo}dir`;
+  const pageKey = `${prefijo}page`;
+  const orden = params.get(ordenKey) ?? "";
+  const dirParam = params.get(dirKey) ?? "";
+  const key = orden || defaultSort.key;
+  const dir: SortDir = dirParam === "asc" || dirParam === "desc" ? dirParam : defaultSort.dir;
+
+  const setSort = useCallback(
+    (next: SortState | null) => {
+      const value = next ?? defaultSort;
+      const clean = value.key === defaultSort.key && value.dir === defaultSort.dir;
+      update({
+        [ordenKey]: clean ? null : value.key,
+        [dirKey]: clean ? null : value.dir,
+        [pageKey]: null,
+      });
+    },
+    [defaultSort, dirKey, ordenKey, pageKey, update],
+  );
+
+  return { key, dir, setSort };
+}
+
 export function useUrlSort(defaultSort: SortState) {
   const { params, update } = useUrlParams();
   const orden = params.get("orden") ?? "";

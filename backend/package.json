@@ -10,7 +10,8 @@
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "test:reportes": "tsx src/services/reporte.calculos.test.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.20.0",
