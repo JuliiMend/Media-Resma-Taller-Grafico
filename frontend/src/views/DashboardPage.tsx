@@ -5,6 +5,7 @@ import { AlertTriangle, ArrowRight, BellRing, CalendarClock, ClipboardList, Pack
 import { api, fetcher, getErrorMessage } from "@/api/client";
 import { useAuth } from "@/auth/AuthContext";
 import { Badge, Button, Card, ErrorBanner, PageHeader } from "@/components/ui";
+import { nombreCliente } from "@/lib/clientes";
 import { cn, formatDate, formatMoney, toDateInput, toNumber } from "@/lib/format";
 import type { Insumo, Pedido, Tarea } from "@/types";
 import { ESTADOS_PEDIDO } from "./pedidos/estados";
@@ -210,7 +211,7 @@ function ProximasEntregasCard({
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold">
                         <span className="text-muted">#{p.id}</span>{" "}
-                        {p.cliente?.nombre ?? `Cliente #${p.clienteId}`}
+                        {nombreCliente(p)}
                       </p>
                       <p className="mt-0.5 text-xs text-muted tabular-nums">Entrega {formatDate(p.fechaEntrega)}</p>
                     </div>

@@ -85,6 +85,9 @@ export const pedidoController = {
   resumen: asyncHandler(async (_req: Request, res: Response) => {
     res.json(await pedidoService.resumen());
   }),
+  deudas: asyncHandler(async (_req: Request, res: Response) => {
+    res.json(await pedidoService.listarDeudas());
+  }),
   pagar: asyncHandler(async (req: Request, res: Response) => {
     const { monto } = pagoPedidoSchema.parse(req.body ?? {});
     const pedido = await pedidoService.pagar(Number(req.params.id), monto);

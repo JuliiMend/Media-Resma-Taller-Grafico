@@ -1,8 +1,10 @@
 import { Fragment, useState } from "react";
+import { mutate as mutateGlobal } from "swr";
 import { Check, ChevronDown, ChevronRight, Copy } from "lucide-react";
 import { api, getErrorMessage } from "@/api/client";
 import { SortControl, SortableHeader } from "@/components/SortableHeader";
 import { Badge, Button, ConfirmDialog, EmptyState, ErrorBanner, Field, Input, Modal } from "@/components/ui";
+import { clienteDe, clientePendiente, nombreCliente } from "@/lib/clientes";
 import { cn, formatDate, formatMoney, toDateInput, toNumber } from "@/lib/format";
 import { sortItems, type SortType } from "@/lib/sort";
 import { useUrlParams, useUrlSort } from "@/lib/url-state";
@@ -31,7 +33,7 @@ const SORT_TYPES: Record<string, SortType> = {
 };
 
 function sortValueOf(g: Grupo, key: string, clientesById: Map<number, Cliente>): unknown {
-  if (key === "cliente") return clientesById.get(g.clienteId)?.nombre ?? "";
+  if (key === "cliente") return clienteDe(g.pedidos[0], clientesById)?.nombre ?? "";
   if (key === "cantidad") return g.pedidos.length;
   if (key === "dias") return g.dias;
   return g.total;
@@ -55,13 +57,16 @@ function textoRecordatorio(nombre: string, g: Grupo): string {
 export function DeudasTab({
   pedidos,
   clientesById,
+  clientesCargando = false,
   onOpen,
   onChanged,
 }: {
   pedidos: Pedido[];
   clientesById: Map<number, Cliente>;
+  clientesCargando?: boolean;
   onOpen: (pedido: Pedido) => void;
-  onChanged: () => void;
+  /** Recibe el id cuando el pedido quedó saldado, para sacarlo de la lista al instante. */
+  onChanged: (pedidoPagadoId?: number) => void | Promise<void>;
 }) {
   const { params, update } = useUrlParams();
   const incluirCurso = params.get("curso") === "1";
@@ -76,7 +81,9 @@ export function DeudasTab({
   const [pagando, setPagando] = useState(false);
   const [copiado, setCopiado] = useState<number | null>(null);
 
-  const conDeuda = pedidos.filter((p) => p.estado !== "CANCELADO" && toNumber(p.restaPagar) > 0);
+  const conDeuda = pedidos.filter(
+    (p) => p.estado !== "CANCELADO" && toNumber(p.restaPagar) > 0.005,
+  );
   const incluidos = incluirCurso
     ? conDeuda
     : conDeuda.filter((p) => p.estado === "LISTO" || p.estado === "ENTREGADO");
@@ -139,12 +146,14 @@ export function DeudasTab({
       setPagoError(`No puede superar la resta (${formatMoney(saldo)}).`);
       return;
     }
+    const pedidoId = pagoPedido.id;
+    const saldado = valor >= saldo - 0.005;
     setPagando(true);
     setPagoError(null);
     try {
-      await api.post(`/pedidos/${pagoPedido.id}/pagos`, { monto: valor });
+      await api.post(`/pedidos/${pedidoId}/pagos`, { monto: valor });
       setPagoPedido(null);
-      onChanged();
+      await onChanged(saldado ? pedidoId : undefined);
     } catch (err) {
       setPagoError(getErrorMessage(err));
     } finally {
@@ -154,12 +163,13 @@ export function DeudasTab({
 
   async function marcarPagado() {
     if (!confirmarPagado) return;
+    const pedidoId = confirmarPagado.id;
     setPagando(true);
     setAccionError(null);
     try {
-      await api.post(`/pedidos/${confirmarPagado.id}/pagos`);
+      await api.post(`/pedidos/${pedidoId}/pagos`);
       setConfirmarPagado(null);
-      onChanged();
+      await onChanged(pedidoId);
     } catch (err) {
       setConfirmarPagado(null);
       setAccionError(getErrorMessage(err));
@@ -169,7 +179,7 @@ export function DeudasTab({
   }
 
   async function copiarRecordatorio(g: Grupo) {
-    const nombre = clientesById.get(g.clienteId)?.nombre ?? "";
+    const nombre = nombreCliente(g.pedidos[0], clientesById);
     try {
       await navigator.clipboard.writeText(textoRecordatorio(nombre, g));
       setCopiado(g.clienteId);
@@ -181,15 +191,28 @@ export function DeudasTab({
 
   const saldoPago = toNumber(pagoPedido?.restaPagar ?? 0);
   const saldoConfirmar = toNumber(confirmarPagado?.restaPagar ?? 0);
+  const clientePago = pagoPedido ? clienteDe(pagoPedido, clientesById) : undefined;
+  const clienteConfirmar = confirmarPagado
+    ? clienteDe(confirmarPagado, clientesById)
+    : undefined;
+  const notaPago = clientePago?.notas?.trim();
+  const notaConfirmar = clienteConfirmar?.notas?.trim();
 
   function DetalleGrupo({ g }: { g: Grupo }) {
-    const cliente = clientesById.get(g.clienteId);
-    const texto = textoRecordatorio(cliente?.nombre ?? "", g);
+    const cliente = clienteDe(g.pedidos[0], clientesById);
+    const texto = textoRecordatorio(nombreCliente(g.pedidos[0], clientesById), g);
     const wa = waLink(cliente?.telefono, texto);
     return (
       <div className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-muted">{cliente?.telefono ?? "Sin teléfono registrado"}</p>
+          <div className="min-w-0">
+            <p className="text-xs text-muted">{cliente?.telefono ?? "Sin teléfono registrado"}</p>
+            {cliente?.notas && (
+              <p className="mt-0.5 line-clamp-2 max-w-prose text-xs text-warning" title={cliente.notas}>
+                {cliente.notas}
+              </p>
+            )}
+          </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" size="sm" onClick={() => copiarRecordatorio(g)}>
               {copiado === g.clienteId ? (
@@ -229,6 +252,14 @@ export function DeudasTab({
                 >
                   Pedido #{p.id}
                 </button>
+                {p.observaciones && (
+                  <span
+                    className="max-w-[18rem] truncate text-muted"
+                    title={p.observaciones}
+                  >
+                    {p.observaciones}
+                  </span>
+                )}
                 <Badge tone={estado.tone}>{estado.label}</Badge>
                 <span className="text-muted">Entrega {p.fechaEntrega ? formatDate(p.fechaEntrega) : "—"}</span>
                 <span className="ml-auto tabular-nums">Total {formatMoney(toNumber(p.sena) + resta)}</span>
@@ -327,7 +358,9 @@ export function DeudasTab({
               </thead>
               <tbody className="divide-y divide-line">
                 {grupos.map((g) => {
-                  const cliente = clientesById.get(g.clienteId);
+                  const cliente = clienteDe(g.pedidos[0], clientesById);
+                  const nombre = nombreCliente(g.pedidos[0], clientesById);
+                  const pendiente = clientePendiente(g.pedidos[0], clientesById, clientesCargando);
                   const open = abierto.has(g.clienteId);
                   return (
                     <Fragment key={g.clienteId}>
@@ -340,7 +373,7 @@ export function DeudasTab({
                             <button
                               type="button"
                               aria-expanded={open}
-                              aria-label={open ? `Ocultar pedidos de ${cliente?.nombre ?? ""}` : `Ver pedidos de ${cliente?.nombre ?? ""}`}
+                              aria-label={open ? `Ocultar pedidos de ${nombre}` : `Ver pedidos de ${nombre}`}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 toggleGrupo(g.clienteId);
@@ -353,9 +386,25 @@ export function DeudasTab({
                                 <ChevronRight className="size-4" aria-hidden="true" />
                               )}
                             </button>
-                            <div>
-                              <p className="font-medium">{cliente?.nombre ?? `Cliente #${g.clienteId}`}</p>
+                            <div className="min-w-0">
+                              {pendiente ? (
+                                <span
+                                  role="status"
+                                  aria-label="Cargando cliente"
+                                  className="inline-block h-4 w-28 animate-pulse rounded bg-raised"
+                                />
+                              ) : (
+                                <p className="font-medium">{nombre}</p>
+                              )}
                               {cliente?.telefono && <p className="text-xs text-muted">{cliente.telefono}</p>}
+                              {cliente?.notas && (
+                                <p
+                                  className="line-clamp-2 max-w-xs text-xs text-warning"
+                                  title={cliente.notas}
+                                >
+                                  {cliente.notas}
+                                </p>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -383,7 +432,9 @@ export function DeudasTab({
 
           <ul className="flex flex-col gap-3 md:hidden">
             {grupos.map((g) => {
-              const cliente = clientesById.get(g.clienteId);
+              const cliente = clienteDe(g.pedidos[0], clientesById);
+              const nombre = nombreCliente(g.pedidos[0], clientesById);
+              const pendiente = clientePendiente(g.pedidos[0], clientesById, clientesCargando);
               const open = abierto.has(g.clienteId);
               return (
                 <li key={g.clienteId} className="rounded-xl border border-line bg-surface">
@@ -394,11 +445,27 @@ export function DeudasTab({
                     className="flex w-full items-center gap-3 p-4 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium">{cliente?.nombre ?? `Cliente #${g.clienteId}`}</p>
+                      {pendiente ? (
+                        <span
+                          role="status"
+                          aria-label="Cargando cliente"
+                          className="inline-block h-4 w-28 animate-pulse rounded bg-raised"
+                        />
+                      ) : (
+                        <p className="font-medium">{nombre}</p>
+                      )}
                       <p className="text-xs text-muted">
                         {cliente?.telefono ? `${cliente.telefono} · ` : ""}
                         {g.pedidos.length} {g.pedidos.length === 1 ? "pedido" : "pedidos"} · {g.dias} días
                       </p>
+                      {cliente?.notas && (
+                        <p
+                          className="mt-0.5 line-clamp-2 text-xs text-warning"
+                          title={cliente.notas}
+                        >
+                          {cliente.notas}
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-danger tabular-nums">{formatMoney(g.total)}</span>
@@ -429,6 +496,12 @@ export function DeudasTab({
         <p className="text-sm text-muted">
           Resta actual: <span className="font-semibold text-danger tabular-nums">{formatMoney(saldoPago)}</span>
         </p>
+        {notaPago && (
+          <div className="mt-3 rounded-lg border border-warning/25 bg-warning-soft/40 px-3 py-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-warning">Nota del cliente</p>
+            <p className="mt-1 whitespace-pre-line text-sm text-pretty">{notaPago}</p>
+          </div>
+        )}
         <div className="mt-4">
           <Field label="Monto a cobrar" htmlFor="pago-monto" hint={`Máximo ${formatMoney(saldoPago)}`}>
             <Input
@@ -467,7 +540,14 @@ export function DeudasTab({
         onConfirm={marcarPagado}
         onCancel={() => setConfirmarPagado(null)}
         loading={pagando}
-      />
+      >
+        {notaConfirmar && (
+          <div className="mt-3 rounded-lg border border-warning/25 bg-warning-soft/40 px-3 py-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-warning">Nota del cliente</p>
+            <p className="mt-1 whitespace-pre-line text-sm text-pretty">{notaConfirmar}</p>
+          </div>
+        )}
+      </ConfirmDialog>
     </div>
   );
 }

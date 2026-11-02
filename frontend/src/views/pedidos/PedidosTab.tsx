@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { Search } from "lucide-react";
 import { fetcher } from "@/api/client";
+import { clientePendiente, nombreCliente } from "@/lib/clientes";
 import { cn, formatDate, formatMoney, toNumber } from "@/lib/format";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { useUrlParams, useUrlSort } from "@/lib/url-state";
@@ -30,6 +31,7 @@ export function PedidosTab({
   resumen,
   savingId,
   clientesById,
+  clientesCargando = false,
   productos,
   onOpen,
   onPageChange,
@@ -42,6 +44,7 @@ export function PedidosTab({
   resumen?: ResumenPedidos;
   savingId?: number | null;
   clientesById: Map<number, Cliente>;
+  clientesCargando?: boolean;
   productos: Producto[];
   onOpen: (pedido: Pedido) => void;
   onPageChange: (page: number) => void;
@@ -172,6 +175,13 @@ export function PedidosTab({
     return <span className="font-semibold text-danger tabular-nums">{formatMoney(resta)}</span>;
   };
 
+  const clienteCell = (p: Pedido) => {
+    if (clientePendiente(p, clientesById, clientesCargando)) {
+      return <span className="inline-block h-4 w-28 animate-pulse rounded bg-ink/10" aria-label="Cargando cliente" />;
+    }
+    return nombreCliente(p, clientesById);
+  };
+
   const openOnKey = (p: Pedido) => (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -242,7 +252,7 @@ export function PedidosTab({
                 }}
                 onFocus={() => setSugerenciasOpen(true)}
                 onPointerDown={(e) => e.stopPropagation()}
-                placeholder="Cliente, trabajo o producto…"
+                placeholder="Cliente, trabajo, producto u observación…"
                 className="pl-9"
                 autoComplete="off"
                 aria-autocomplete="list"
@@ -368,12 +378,14 @@ export function PedidosTab({
             <table className="w-full text-sm">
               <thead className="border-b border-line bg-background/60 text-left text-xs uppercase tracking-wide text-muted">
                 <tr>
+                  <th scope="col" className="px-4 py-3 font-medium">Nº de pedido</th>
                   <SortableHeader label="Fecha" sortKey="fecha" sort={sortView} onSort={cambiarOrden} />
+                  <th scope="col" className="px-4 py-3 font-medium">Observación</th>
                   <SortableHeader label="Cliente" sortKey="cliente" sort={sortView} onSort={cambiarOrden} />
                   <th scope="col" className="px-4 py-3 font-medium">Estado</th>
-                  <SortableHeader label="Entrega" sortKey="entrega" sort={sortView} onSort={cambiarOrden} />
                   <SortableHeader label="Total" sortKey="total" sort={sortView} onSort={cambiarOrden} align="right" />
                   <SortableHeader label="Debe" sortKey="resta" sort={sortView} onSort={cambiarOrden} align="right" />
+                  <SortableHeader label="Entrega" sortKey="entrega" sort={sortView} onSort={cambiarOrden} />
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
@@ -395,22 +407,28 @@ export function PedidosTab({
                       )}
                     >
                       <td className="px-4 py-3">
-                        <span className="font-medium">#{p.id}</span>
-                        <span className="ml-2 text-muted">{formatDate(p.fecha)}</span>
+                        <span className="text-base font-bold tabular-nums">#{p.id}</span>
                       </td>
+                      <td className="px-4 py-3 text-muted">{formatDate(p.fecha)}</td>
                       <td className="px-4 py-3">
-                        {clientesById.get(p.clienteId)?.nombre ?? `Cliente #${p.clienteId}`}
+                        <span
+                          className="line-clamp-2 max-w-[18rem] text-sm text-muted"
+                          title={p.observaciones?.trim() || undefined}
+                        >
+                          {p.observaciones?.trim() || "—"}
+                        </span>
                       </td>
+                      <td className="px-4 py-3">{clienteCell(p)}</td>
                       <td className="px-4 py-3">
                         <Badge tone={estado.tone}>{estado.label}</Badge>
-                      </td>
-                      <td className="px-4 py-3 text-muted">
-                        {p.fechaEntrega ? formatDate(p.fechaEntrega) : "—"}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums">
                         {formatMoney(toNumber(p.sena) + toNumber(p.restaPagar))}
                       </td>
                       <td className="px-4 py-3 text-right">{debeCell(p)}</td>
+                      <td className="px-4 py-3 text-muted">
+                        {p.fechaEntrega ? formatDate(p.fechaEntrega) : "—"}
+                      </td>
                     </tr>
                   );
                 })}
@@ -434,16 +452,22 @@ export function PedidosTab({
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium">
-                          {clientesById.get(p.clienteId)?.nombre ?? `Cliente #${p.clienteId}`}
-                        </span>
+                        <span className="font-semibold tabular-nums">#{p.id}</span>
+                        <span className="text-muted">·</span>
+                        <span className="font-medium">{clienteCell(p)}</span>
                         <Badge tone={estado.tone}>{estado.label}</Badge>
                         {resta > 0 && p.estado !== "CANCELADO" && (
                           <Badge tone="danger">Debe {formatMoney(resta)}</Badge>
                         )}
                       </div>
-                      <p className="mt-0.5 text-sm text-muted">
-                        #{p.id} · {formatDate(p.fecha)}
+                      <p
+                        className="mt-1 line-clamp-2 text-sm text-muted"
+                        title={p.observaciones?.trim() || undefined}
+                      >
+                        {p.observaciones?.trim() || "—"}
+                      </p>
+                      <p className="mt-1 text-xs text-muted">
+                        {formatDate(p.fecha)}
                         {p.fechaEntrega && ` · Entrega ${formatDate(p.fechaEntrega)}`}
                       </p>
                     </div>

@@ -8,8 +8,10 @@ export interface FilaVenta {
   unidad: string;
   cantidad: number;
   ingresos: number;
+  ingresosConCosto: number;
   costo: number;
   ganancia: number;
+  costoCompleto: boolean;
 }
 
 interface FilaVentaCruda {
@@ -19,7 +21,9 @@ interface FilaVentaCruda {
   unidad: string;
   cantidad: number;
   ingresos: number;
-  costo: number;
+  ingresosConCosto: number | null;
+  costo: number | null;
+  costoCompleto: boolean;
 }
 
 export const reporteRepository = {
@@ -52,7 +56,11 @@ export const reporteRepository = {
         COALESCE(pr.unidad, 'u') AS "unidad",
         SUM(t.cantidad)::float8 AS "cantidad",
         SUM(t.cantidad * t."valorUnitario")::float8 AS "ingresos",
-        SUM(t.cantidad * COALESCE(t."costoUnitario", 0))::float8 AS "costo"
+        SUM(t.cantidad * t."valorUnitario")
+          FILTER (WHERE t."costoUnitario" IS NOT NULL)::float8 AS "ingresosConCosto",
+        SUM(t.cantidad * t."costoUnitario")
+          FILTER (WHERE t."costoUnitario" IS NOT NULL)::float8 AS "costo",
+        BOOL_AND(t."costoUnitario" IS NOT NULL) AS "costoCompleto"
       FROM "Pedido" p
       JOIN "Trabajo" t ON t."pedidoId" = p.id
       LEFT JOIN "Producto" pr ON pr.id = t."productoId"
@@ -72,8 +80,11 @@ export const reporteRepository = {
       unidad: fila.unidad,
       cantidad: Number(fila.cantidad),
       ingresos: Number(fila.ingresos),
-      costo: Number(fila.costo),
-      ganancia: Number(fila.ingresos) - Number(fila.costo),
+      ingresosConCosto: Number(fila.ingresosConCosto ?? 0),
+      costo: Number(fila.costo ?? 0),
+      ganancia:
+        Number(fila.ingresosConCosto ?? 0) - Number(fila.costo ?? 0),
+      costoCompleto: Boolean(fila.costoCompleto),
     }));
   },
 };

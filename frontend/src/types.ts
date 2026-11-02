@@ -96,8 +96,12 @@ export interface Pedido {
   cliente?: Cliente;
   trabajos?: Trabajo[];
   total?: Decimal | null;
+  ventaConCosto?: Decimal | null;
   costoTotal?: Decimal | null;
   ganancia?: Decimal | null;
+  margen?: Decimal | null;
+  recargo?: Decimal | null;
+  costoCompleto?: boolean;
 }
 
 export interface PaginaPedidos {
@@ -120,8 +124,10 @@ export interface FilaVenta {
   unidad: string;
   cantidad: Decimal;
   ingresos: Decimal;
+  ingresosConCosto: Decimal;
   costo: Decimal;
   ganancia: Decimal;
+  costoCompleto: boolean;
 }
 
 export interface Tarea {

@@ -1,9 +1,10 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, getErrorMessage } from "@/api/client";
 import { Button, ErrorBanner, Field, Input, Modal } from "@/components/ui";
+import { PrecioConRecargo } from "@/components/PrecioConRecargo";
 import { SearchSelect } from "@/components/SearchSelect";
 import { ProductoQuickModal } from "@/components/QuickCreate";
-import { cn, formatMoney, toNumber } from "@/lib/format";
+import { toNumber } from "@/lib/format";
 import type { Producto, Trabajo } from "@/types";
 
 export function TrabajoFormModal({
@@ -67,8 +68,6 @@ export function TrabajoFormModal({
     setProductoModal(false);
   }
 
-  const ganancia = (toNumber(valorUnitario) - toNumber(costo)) * toNumber(cantidad);
-
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!descripcion.trim()) return setError("Completá la descripción");
@@ -118,31 +117,16 @@ export function TrabajoFormModal({
           <Field label="Cantidad" htmlFor="t-cant">
             <Input id="t-cant" type="number" min={0} step="any" inputMode="decimal" value={cantidad} onChange={(e) => setCantidad(e.target.value)} className="min-w-[7rem] text-right tabular-nums" />
           </Field>
-          <Field label="Valor unitario" htmlFor="t-valor">
-            <Input id="t-valor" type="number" min={0} step="0.01" value={valorUnitario} onChange={(e) => setValorUnitario(e.target.value)} />
-          </Field>
-          <Field label="Costo unitario" htmlFor="t-costo">
-            <Input
-              id="t-costo"
-              type="number"
-              min={0}
-              step="any"
-              inputMode="decimal"
-              value={costo}
-              onChange={(e) => setCosto(e.target.value)}
-              placeholder="Costo (opcional)"
-              className="text-right tabular-nums"
-            />
-          </Field>
         </div>
-        <p
-          className={cn(
-            "text-right text-xs font-medium tabular-nums",
-            costo === "" ? "text-muted" : ganancia >= 0 ? "text-success" : "text-danger",
-          )}
-        >
-          Ganancia estimada: {costo === "" ? "—" : formatMoney(ganancia)}
-        </p>
+        <PrecioConRecargo
+          idPrefix="trabajo"
+          costo={costo}
+          precio={valorUnitario}
+          onChangeCosto={setCosto}
+          onChangePrecio={setValorUnitario}
+          costoLabel="Costo unitario"
+          precioLabel="Valor unitario"
+        />
         {error && <ErrorBanner message={error} />}
         <div className="flex justify-end gap-2 pt-1">
           <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>

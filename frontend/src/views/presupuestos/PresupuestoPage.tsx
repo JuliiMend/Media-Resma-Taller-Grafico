@@ -17,16 +17,23 @@ import {
 import { api, fetcher, getErrorMessage } from "@/api/client";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Card, ConfirmDialog, ErrorBanner, Field, Input, Modal, PageHeader, Select, Textarea } from "@/components/ui";
+import { PrecioConRecargo } from "@/components/PrecioConRecargo";
 import { SearchSelect } from "@/components/SearchSelect";
 import { ClienteQuickModal, ProductoQuickModal } from "@/components/QuickCreate";
 import { cn, formatMoney, toNumber } from "@/lib/format";
+import {
+  AYUDA_MARGEN_RECARGO,
+  formatPorcentaje,
+  gananciaUnitaria,
+  margenSobreVenta,
+  recargoDesdePrecio,
+} from "@/lib/precio";
 import { UNIDADES_PRODUCTO } from "@/lib/unidades";
 import { BORRADOR_KEY, LEYENDA_LEGAL, NEGOCIO } from "@/lib/presupuesto-config";
 import {
   borradorVacio,
   calcularTotales,
   fechaCorta,
-  formatMargen,
   lineasValidas,
   nombreArchivoPresupuesto,
   numeroPresupuesto,
@@ -625,8 +632,9 @@ export function PresupuestoPage() {
             const costo = linea.costoUnitario === "" ? null : toNumber(linea.costoUnitario);
             const precio = toNumber(linea.precioUnitario);
             const cantidad = toNumber(linea.cantidad);
-            const ganancia = costo === null ? null : (precio - costo) * cantidad;
-            const margen = costo === null || precio <= 0 ? null : ((precio - costo) / precio) * 100;
+            const ganancia = costo === null ? null : gananciaUnitaria(costo, precio) * cantidad;
+            const margen = costo === null ? null : margenSobreVenta(costo, precio);
+            const recargo = costo === null ? null : recargoDesdePrecio(costo, precio);
             const bajoCosto = costo !== null && precio < costo;
 
             return (
@@ -678,7 +686,7 @@ export function PresupuestoPage() {
                       </Select>
                     </Field>
                   </div>
-                  <div className="sm:col-span-3">
+                  <div className="sm:col-span-4">
                     <Field label="Cantidad" htmlFor={`l-cant-${linea.key}`}>
                       <Input
                         id={`l-cant-${linea.key}`}
@@ -692,19 +700,7 @@ export function PresupuestoPage() {
                       />
                     </Field>
                   </div>
-                  <div className="sm:col-span-3">
-                    <Field label="Precio unitario" htmlFor={`l-precio-${linea.key}`}>
-                      <Input
-                        id={`l-precio-${linea.key}`}
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={linea.precioUnitario}
-                        onChange={(e) => patchLinea(linea.key, { precioUnitario: e.target.value })}
-                      />
-                    </Field>
-                  </div>
-                  <div className="sm:col-span-3">
+                  <div className="sm:col-span-4">
                     <Field label="Subtotal" htmlFor={`l-sub-${linea.key}`}>
                       <Input
                         id={`l-sub-${linea.key}`}
@@ -714,7 +710,7 @@ export function PresupuestoPage() {
                       />
                     </Field>
                   </div>
-                  <div className="flex justify-end sm:col-span-1">
+                  <div className="flex justify-end sm:col-span-2">
                     <Button
                       type="button"
                       variant="ghost"
@@ -733,30 +729,30 @@ export function PresupuestoPage() {
                   </div>
                 </div>
 
+                <PrecioConRecargo
+                  className="mt-3"
+                  idPrefix={`pres-${linea.key}`}
+                  costo={linea.costoUnitario}
+                  precio={linea.precioUnitario}
+                  onChangeCosto={(valor) => patchLinea(linea.key, { costoUnitario: valor })}
+                  onChangePrecio={(valor) => patchLinea(linea.key, { precioUnitario: valor })}
+                  costoLabel="Costo unitario (interno)"
+                  precioLabel="Precio unitario"
+                  showResumen={false}
+                  hint="El recargo es solo una ayuda de carga: no se guarda en la base."
+                />
+
                 <div className="mt-3 rounded-lg border border-warning/25 bg-warning-soft/40 p-3">
                   <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-warning">
                     <Lock className="size-3.5" aria-hidden="true" />
                     Solo interno — no sale en el PDF
                   </p>
-                  <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="grid gap-3 sm:grid-cols-4">
                     <div>
                       <span className="text-xs text-muted">Costo unitario</span>
-                      {linea.personalizado ? (
-                        <Input
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          aria-label="Costo unitario (interno)"
-                          value={linea.costoUnitario}
-                          onChange={(e) => patchLinea(linea.key, { costoUnitario: e.target.value })}
-                          placeholder="Sin costo"
-                          className="mt-1 h-9"
-                        />
-                      ) : (
-                        <p className={cn("mt-1 text-sm font-semibold tabular-nums", bajoCosto && "text-danger")}>
-                          {costo === null ? <span className="text-muted">Sin costo</span> : formatMoney(costo)}
-                        </p>
-                      )}
+                      <p className={cn("mt-1 text-sm font-semibold tabular-nums", bajoCosto && "text-danger")}>
+                        {costo === null ? <span className="text-muted">Sin costo</span> : formatMoney(costo)}
+                      </p>
                     </div>
                     <div>
                       <span className="text-xs text-muted">Ganancia (línea)</span>
@@ -765,9 +761,15 @@ export function PresupuestoPage() {
                       </p>
                     </div>
                     <div>
-                      <span className="text-xs text-muted">Margen</span>
+                      <span className="text-xs text-muted" title={AYUDA_MARGEN_RECARGO}>Recargo sobre costo</span>
+                      <p className={cn("mt-1 text-sm font-semibold tabular-nums", recargo !== null && recargo < 0 && "text-danger")}>
+                        {formatPorcentaje(recargo)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-muted" title={AYUDA_MARGEN_RECARGO}>Margen sobre venta</span>
                       <p className={cn("mt-1 text-sm font-semibold tabular-nums", margen !== null && margen < 0 && "text-danger")}>
-                        {formatMargen(margen)}
+                        {formatPorcentaje(margen)}
                       </p>
                     </div>
                   </div>
@@ -886,7 +888,16 @@ export function PresupuestoPage() {
           </div>
         )}
 
-        <dl className="grid grid-cols-3 gap-4">
+        {!totales.costoCompleto && hayItems && (
+          <div role="status" className="mb-4 flex items-start gap-3 rounded-lg border border-warning/30 bg-warning-soft/50 p-3 text-sm text-warning">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <p>
+              Costo incompleto: hay ítems sin costo cargado. El margen y la ganancia se calculan solo sobre los ítems con costo.
+            </p>
+          </div>
+        )}
+
+        <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div>
             <dt className="text-xs text-muted">Costo total</dt>
             <dd className="text-lg font-semibold tabular-nums">{formatMoney(totales.costoTotal)}</dd>
@@ -898,14 +909,20 @@ export function PresupuestoPage() {
             </dd>
           </div>
           <div>
-            <dt className="text-xs text-muted">Margen</dt>
+            <dt className="text-xs text-muted" title={AYUDA_MARGEN_RECARGO}>Recargo sobre costo</dt>
+            <dd className={cn("text-lg font-semibold tabular-nums", totales.recargo !== null && totales.recargo < 0 && "text-danger")}>
+              {formatPorcentaje(totales.recargo)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted" title={AYUDA_MARGEN_RECARGO}>Margen sobre venta</dt>
             <dd className={cn("text-lg font-semibold tabular-nums", totales.margen !== null && totales.margen < 0 && "text-danger")}>
-              {formatMargen(totales.margen)}
+              {formatPorcentaje(totales.margen)}
             </dd>
           </div>
         </dl>
         <p className="mt-3 text-xs text-muted">
-          Margen y ganancia calculados sobre el subtotal con descuento. Esta información nunca se comparte.
+          {AYUDA_MARGEN_RECARGO} Margen y ganancia calculados sobre el subtotal con descuento, sin envío. Esta información nunca se comparte.
         </p>
       </section>
 

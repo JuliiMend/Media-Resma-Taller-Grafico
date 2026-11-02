@@ -57,6 +57,7 @@ const buildWhere = (filtros: PedidoFiltros = {}): Prisma.PedidoWhereInput => {
     condiciones.push({
       OR: [
         { cliente: { nombre: { contains: filtros.q, mode: "insensitive" } } },
+        { observaciones: { contains: filtros.q, mode: "insensitive" } },
         { trabajos: { some: { descripcion: { contains: filtros.q, mode: "insensitive" } } } },
         {
           trabajos: {

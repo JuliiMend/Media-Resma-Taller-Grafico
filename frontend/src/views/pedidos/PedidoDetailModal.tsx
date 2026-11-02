@@ -3,7 +3,15 @@ import useSWR from "swr";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { api, fetcher, getErrorMessage } from "@/api/client";
 import { Badge, Button, ConfirmDialog, ErrorBanner, Field, Input, Modal, Select } from "@/components/ui";
+import { clienteDe, nombreCliente } from "@/lib/clientes";
 import { cn, formatCantidad, formatDate, formatDateTime, formatMoney, toNumber } from "@/lib/format";
+import {
+  AYUDA_MARGEN_RECARGO,
+  formatPorcentaje,
+  gananciaUnitaria,
+  margenSobreVenta,
+  recargoDesdePrecio,
+} from "@/lib/precio";
 import type { Cliente, HistorialEntry, Pedido, Producto, Trabajo } from "@/types";
 import { ESTADOS_PEDIDO } from "./estados";
 import { TrabajoFormModal } from "./TrabajoFormModal";
@@ -72,7 +80,27 @@ export function PedidoDetailModal({
   const ganancia = toNumber(pedido.ganancia);
   const saldado = resta <= 0;
   const bloqueado = savingEstado || savingEstadoPedido;
-  const nombreCliente = pedido.cliente?.nombre ?? cliente?.nombre ?? `#${pedido.clienteId}`;
+  const clientesMap = cliente ? new Map<number, Cliente>([[cliente.id, cliente]]) : undefined;
+  const nombreClienteMostrado = nombreCliente(pedido, clientesMap);
+  const clienteInfo = clienteDe(pedido, clientesMap);
+  const notaCliente = clienteInfo?.notas?.trim();
+  const costoCompleto =
+    pedido.costoCompleto ??
+    trabajos.every((t) => t.costoUnitario !== null && t.costoUnitario !== undefined);
+  const ventaConCosto =
+    pedido.ventaConCosto !== null && pedido.ventaConCosto !== undefined
+      ? toNumber(pedido.ventaConCosto)
+      : trabajos
+          .filter((t) => t.costoUnitario !== null && t.costoUnitario !== undefined)
+          .reduce((s, t) => s + toNumber(t.cantidad) * toNumber(t.valorUnitario), 0);
+  const margenPedido =
+    pedido.margen !== null && pedido.margen !== undefined
+      ? toNumber(pedido.margen)
+      : margenSobreVenta(costoTotal, ventaConCosto);
+  const recargoPedido =
+    pedido.recargo !== null && pedido.recargo !== undefined
+      ? toNumber(pedido.recargo)
+      : recargoDesdePrecio(costoTotal, ventaConCosto);
 
   async function guardarEstado(estado: string, cobrar: boolean) {
     if (!pedido) return;
@@ -166,7 +194,7 @@ export function PedidoDetailModal({
   }
 
   const info: [string, string][] = [
-    ["Cliente", nombreCliente],
+    ["Cliente", nombreClienteMostrado],
     ["Fecha", formatDate(pedido.fecha)],
     ["Entrega", formatDate(pedido.fechaEntrega)],
     ["Medio de pago", pedido.medioPago || "—"],
@@ -195,6 +223,13 @@ export function PedidoDetailModal({
         </div>
 
         {error && <ErrorBanner message={error} />}
+
+        {notaCliente && (
+          <div className="rounded-xl border border-warning/25 bg-warning-soft/40 px-4 py-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-warning">Nota del cliente</h3>
+            <p className="mt-1 whitespace-pre-line text-sm text-pretty">{notaCliente}</p>
+          </div>
+        )}
 
         <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-5">
           {info.map(([label, value]) => (
@@ -274,6 +309,8 @@ export function PedidoDetailModal({
                     <th scope="col" className="px-3 py-2 text-right font-medium">Subtotal</th>
                     <th scope="col" className="px-3 py-2 text-right font-medium">Costo unit.</th>
                     <th scope="col" className="px-3 py-2 text-right font-medium">Ganancia</th>
+                    <th scope="col" className="px-3 py-2 text-right font-medium" title={AYUDA_MARGEN_RECARGO}>Recargo s/ costo</th>
+                    <th scope="col" className="px-3 py-2 text-right font-medium" title={AYUDA_MARGEN_RECARGO}>Margen s/ venta</th>
                     <th scope="col" className="px-3 py-2"><span className="sr-only">Acciones</span></th>
                   </tr>
                 </thead>
@@ -281,8 +318,11 @@ export function PedidoDetailModal({
                   {trabajos.map((t) => {
                     const cantidad = toNumber(t.cantidad);
                     const subtotal = cantidad * toNumber(t.valorUnitario);
+                    const costoUnitario = toNumber(t.costoUnitario);
                     const tieneCosto = t.costoUnitario !== null && t.costoUnitario !== undefined;
-                    const gananciaLinea = subtotal - cantidad * toNumber(t.costoUnitario);
+                    const gananciaLinea = tieneCosto ? gananciaUnitaria(costoUnitario, toNumber(t.valorUnitario)) * cantidad : null;
+                    const recargoLinea = tieneCosto ? recargoDesdePrecio(costoUnitario, toNumber(t.valorUnitario)) : null;
+                    const margenLinea = tieneCosto ? margenSobreVenta(costoUnitario, toNumber(t.valorUnitario)) : null;
                     return (
                       <tr key={t.id}>
                         <td className="px-3 py-2">{t.descripcion}</td>
@@ -290,7 +330,9 @@ export function PedidoDetailModal({
                         <td className="px-3 py-2 text-right tabular-nums">{formatMoney(t.valorUnitario)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{formatMoney(subtotal)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{tieneCosto ? formatMoney(t.costoUnitario) : "—"}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatMoney(gananciaLinea)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{gananciaLinea === null ? "—" : formatMoney(gananciaLinea)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatPorcentaje(recargoLinea)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatPorcentaje(margenLinea)}</td>
                         <td className="px-3 py-2">
                           <div className="flex justify-end gap-1">
                             <Button
@@ -320,7 +362,13 @@ export function PedidoDetailModal({
             </div>
           )}
 
-          <dl className="mt-3 grid grid-cols-3 gap-4 rounded-lg bg-background p-4 text-sm">
+          {!costoCompleto && trabajos.length > 0 && (
+            <div role="status" className="mt-3 rounded-lg border border-warning/30 bg-warning-soft/50 px-3 py-2 text-xs text-warning">
+              Costo incompleto: el margen y la ganancia se calculan solo sobre los trabajos con costo cargado.
+            </div>
+          )}
+
+          <dl className="mt-3 grid grid-cols-2 gap-4 rounded-lg bg-background p-4 text-sm sm:grid-cols-5">
             <div>
               <dt className="text-xs text-muted">Total</dt>
               <dd className="font-semibold tabular-nums">{formatMoney(total)}</dd>
@@ -333,7 +381,20 @@ export function PedidoDetailModal({
               <dt className="text-xs text-muted">Ganancia</dt>
               <dd className="font-semibold tabular-nums text-success">{formatMoney(ganancia)}</dd>
             </div>
+            <div>
+              <dt className="text-xs text-muted" title={AYUDA_MARGEN_RECARGO}>Recargo sobre costo</dt>
+              <dd className={cn("font-semibold tabular-nums", recargoPedido !== null && recargoPedido < 0 && "text-danger")}>
+                {formatPorcentaje(recargoPedido)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted" title={AYUDA_MARGEN_RECARGO}>Margen sobre venta</dt>
+              <dd className={cn("font-semibold tabular-nums", margenPedido !== null && margenPedido < 0 && "text-danger")}>
+                {formatPorcentaje(margenPedido)}
+              </dd>
+            </div>
           </dl>
+          <p className="mt-2 text-xs text-muted">{AYUDA_MARGEN_RECARGO} El margen del pedido excluye el envío.</p>
         </section>
 
         <details className="rounded-xl border border-line bg-background/50 p-4">
@@ -390,6 +451,12 @@ export function PedidoDetailModal({
               placeholder="0,00"
             />
           </Field>
+          {notaCliente && (
+            <div className="rounded-lg border border-warning/25 bg-warning-soft/40 px-3 py-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-warning">Nota del cliente</p>
+              <p className="mt-1 whitespace-pre-line text-sm text-pretty">{notaCliente}</p>
+            </div>
+          )}
           {pagoError && <ErrorBanner message={pagoError} />}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={() => setPagoOpen(false)} disabled={pagoSaving}>
@@ -425,7 +492,14 @@ export function PedidoDetailModal({
         onConfirm={() => void marcarComoPagado()}
         onCancel={() => setConfirmPagar(false)}
         loading={bloqueado}
-      />
+      >
+        {notaCliente && (
+          <div className="mt-3 rounded-lg border border-warning/25 bg-warning-soft/40 px-3 py-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-warning">Nota del cliente</p>
+            <p className="mt-1 whitespace-pre-line text-sm text-pretty">{notaCliente}</p>
+          </div>
+        )}
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={toDeleteTrabajo !== null}

@@ -28,8 +28,10 @@ function labelMes(mes: string): string {
 interface TotalesMes {
   cantidad: number;
   ingresos: number;
+  ingresosConCosto: number;
   costo: number;
   ganancia: number;
+  costoCompleto: boolean;
 }
 
 function acumular(filas: FilaVenta[]): TotalesMes {
@@ -37,10 +39,19 @@ function acumular(filas: FilaVenta[]): TotalesMes {
     (acc, f) => ({
       cantidad: acc.cantidad + toNumber(f.cantidad),
       ingresos: acc.ingresos + toNumber(f.ingresos),
+      ingresosConCosto: acc.ingresosConCosto + toNumber(f.ingresosConCosto),
       costo: acc.costo + toNumber(f.costo),
       ganancia: acc.ganancia + toNumber(f.ganancia),
+      costoCompleto: acc.costoCompleto && f.costoCompleto,
     }),
-    { cantidad: 0, ingresos: 0, costo: 0, ganancia: 0 },
+    {
+      cantidad: 0,
+      ingresos: 0,
+      ingresosConCosto: 0,
+      costo: 0,
+      ganancia: 0,
+      costoCompleto: true,
+    },
   );
 }
 
@@ -145,13 +156,25 @@ export function ReportesPage() {
                 <p className="text-lg font-semibold tabular-nums">{formatMoney(totales.costo)}</p>
               </div>
               <div className="rounded-xl border border-line bg-surface px-4 py-3">
-                <p className="text-xs text-muted">Ganancia</p>
+                <p className="text-xs text-muted">
+                  {totales.costoCompleto ? "Ganancia" : "Ganancia (ventas con costo)"}
+                </p>
                 <p className="text-lg font-semibold tabular-nums text-success">{formatMoney(totales.ganancia)}</p>
               </div>
               <div className="rounded-xl border border-line bg-surface px-4 py-3">
                 <p className="text-xs text-muted">Meses con ventas</p>
                 <p className="text-lg font-semibold tabular-nums">{porMes.length}</p>
               </div>
+            </div>
+          )}
+
+          {totales && !totales.costoCompleto && (
+            <div className="mb-6 rounded-xl border border-warning/25 bg-warning-soft/40 px-4 py-3 text-sm">
+              <p className="font-medium text-warning">Costo incompleto</p>
+              <p className="mt-1 text-muted text-pretty">
+                Hay ventas sin costo cargado. La ganancia se calcula solo sobre las ventas con
+                costo ({formatMoney(totales.ingresosConCosto)} de {formatMoney(totales.ingresos)}).
+              </p>
             </div>
           )}
 
@@ -182,7 +205,19 @@ export function ReportesPage() {
                       <tbody className="divide-y divide-line">
                         {rows.map((f, i) => (
                           <tr key={`${mes}-${f.productoId ?? "sin"}-${i}`}>
-                            <td className="px-4 py-2.5">{f.producto}</td>
+                            <td className="px-4 py-2.5">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span>{f.producto}</span>
+                                {!f.costoCompleto && (
+                                  <span
+                                    className="rounded-full border border-warning/30 bg-warning-soft/60 px-2 py-0.5 text-[11px] font-medium text-warning"
+                                    title="Algunas líneas de esta venta no tienen costo cargado. La ganancia solo considera las que sí lo tienen."
+                                  >
+                                    Costo incompleto
+                                  </span>
+                                )}
+                              </div>
+                            </td>
                             <td className="px-4 py-2.5 text-right tabular-nums">
                               {numFormatter.format(toNumber(f.cantidad))} {f.unidad}
                             </td>
@@ -194,7 +229,12 @@ export function ReportesPage() {
                       </tbody>
                       <tfoot className="border-t border-line bg-background/40 font-semibold">
                         <tr>
-                          <td className="px-4 py-2.5 text-right">Total {labelMes(mes)}</td>
+                          <td className="px-4 py-2.5 text-right">
+                            Total {labelMes(mes)}
+                            {!mesTotales.costoCompleto && (
+                              <span className="ml-2 text-xs font-normal text-warning">(costo incompleto)</span>
+                            )}
+                          </td>
                           <td className="px-4 py-2.5 text-right tabular-nums" />
                           <td className="px-4 py-2.5 text-right tabular-nums">{formatMoney(mesTotales.ingresos)}</td>
                           <td className="px-4 py-2.5 text-right tabular-nums">{formatMoney(mesTotales.costo)}</td>

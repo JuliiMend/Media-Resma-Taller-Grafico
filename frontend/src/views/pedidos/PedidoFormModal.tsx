@@ -3,6 +3,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { api, getErrorMessage } from "@/api/client";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, ErrorBanner, Field, Input, Modal, Select, Textarea } from "@/components/ui";
+import { PrecioConRecargo } from "@/components/PrecioConRecargo";
 import { SearchSelect } from "@/components/SearchSelect";
 import { ClienteQuickModal, ProductoQuickModal } from "@/components/QuickCreate";
 import { cn, formatMoney, toDateInput, toNumber } from "@/lib/format";
@@ -224,10 +225,9 @@ export function PedidoFormModal({
           <fieldset className="flex flex-col gap-3">
             <legend className="mb-2 text-sm font-semibold">Trabajos</legend>
             {lineas.map((l, idx) => {
-              const gananciaLinea = (toNumber(l.valorUnitario) - toNumber(l.costoUnitario)) * toNumber(l.cantidad);
               return (
               <div key={l.key} className="rounded-lg border border-line bg-background/50 p-3">
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(8rem,1.3fr)_minmax(8rem,1.3fr)_6.5rem_7rem_7rem_2.5rem] lg:items-end">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(8rem,1.3fr)_minmax(8rem,1.3fr)_6.5rem_2.5rem] lg:items-end">
                 <div className="min-w-0">
                   <Field label="Producto" htmlFor={`l-prod-${l.key}`}>
                     <SearchSelect
@@ -265,34 +265,6 @@ export function PedidoFormModal({
                     />
                   </Field>
                 </div>
-                <div className="min-w-0">
-                  <Field label="Valor unit." htmlFor={`l-val-${l.key}`}>
-                    <Input
-                      id={`l-val-${l.key}`}
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={l.valorUnitario}
-                      onChange={(e) => updateLinea(l.key, { valorUnitario: e.target.value })}
-                      className="text-right tabular-nums"
-                    />
-                  </Field>
-                </div>
-                <div className="min-w-0">
-                  <Field label="Costo unit." htmlFor={`l-costo-${l.key}`}>
-                    <Input
-                      id={`l-costo-${l.key}`}
-                      type="number"
-                      min={0}
-                      step="any"
-                      inputMode="decimal"
-                      value={l.costoUnitario}
-                      onChange={(e) => updateLinea(l.key, { costoUnitario: e.target.value })}
-                      placeholder="Costo (opcional)"
-                      className="text-right tabular-nums"
-                    />
-                  </Field>
-                </div>
                 <div className="flex justify-end lg:justify-self-end">
                   <Button
                     type="button"
@@ -306,14 +278,16 @@ export function PedidoFormModal({
                   </Button>
                 </div>
                 </div>
-                <p
-                  className={cn(
-                    "mt-2 text-right text-xs font-medium tabular-nums",
-                    l.costoUnitario === "" ? "text-muted" : gananciaLinea >= 0 ? "text-success" : "text-danger",
-                  )}
-                >
-                  Ganancia estimada: {l.costoUnitario === "" ? "—" : formatMoney(gananciaLinea)}
-                </p>
+                <PrecioConRecargo
+                  className="mt-3"
+                  idPrefix={`linea-${l.key}`}
+                  costo={l.costoUnitario}
+                  precio={l.valorUnitario}
+                  onChangeCosto={(valor) => updateLinea(l.key, { costoUnitario: valor })}
+                  onChangePrecio={(valor) => updateLinea(l.key, { valorUnitario: valor })}
+                  costoLabel="Costo unit."
+                  precioLabel="Valor unit."
+                />
               </div>
               );
             })}
