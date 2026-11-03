@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../config/db";
 import { CrearPedidoInput, ActualizarPedidoInput } from "@/schemas/pedido.schema";
+import { UMBRAL_DEUDA } from "../utils/dinero";
 
 export interface PedidoFiltros {
   productoId?: number;
@@ -22,10 +23,10 @@ export interface PedidoResumen {
   conDeuda: number;
 }
 
-/** Condición única de deuda: ni cancelado ni saldado. */
+/** Condición única de deuda: ni cancelado ni saldado (mínimo un centavo). */
 export const whereDeuda: Prisma.PedidoWhereInput = {
   estado: { not: "CANCELADO" },
-  restaPagar: { gt: 0 },
+  restaPagar: { gte: UMBRAL_DEUDA },
 };
 
 const buildWhere = (filtros: PedidoFiltros = {}): Prisma.PedidoWhereInput => {
@@ -159,8 +160,8 @@ export const pedidoRepository = {
     >(Prisma.sql`
       SELECT
         COUNT(*) FILTER (WHERE "estado" NOT IN ('ENTREGADO', 'CANCELADO'))::int AS "activos",
-        COALESCE(SUM("restaPagar") FILTER (WHERE "estado" <> 'CANCELADO' AND COALESCE("restaPagar", 0) > 0), 0)::float8 AS "saldoPendiente",
-        COUNT(*) FILTER (WHERE "estado" <> 'CANCELADO' AND COALESCE("restaPagar", 0) > 0)::int AS "conDeuda"
+        COALESCE(SUM("restaPagar") FILTER (WHERE "estado" <> 'CANCELADO' AND COALESCE("restaPagar", 0) >= ${UMBRAL_DEUDA}), 0)::float8 AS "saldoPendiente",
+        COUNT(*) FILTER (WHERE "estado" <> 'CANCELADO' AND COALESCE("restaPagar", 0) >= ${UMBRAL_DEUDA})::int AS "conDeuda"
       FROM "Pedido"
     `);
     return {

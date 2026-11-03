@@ -5,6 +5,7 @@ import { api, getErrorMessage } from "@/api/client";
 import { SortControl, SortableHeader } from "@/components/SortableHeader";
 import { Badge, Button, ConfirmDialog, EmptyState, ErrorBanner, Field, Input, Modal } from "@/components/ui";
 import { clienteDe, clientePendiente, nombreCliente } from "@/lib/clientes";
+import { tieneDeuda } from "@/lib/deudas";
 import { cn, formatDate, formatMoney, toDateInput, toNumber } from "@/lib/format";
 import { sortItems, type SortType } from "@/lib/sort";
 import { useUrlParams, useUrlSort } from "@/lib/url-state";
@@ -81,9 +82,7 @@ export function DeudasTab({
   const [pagando, setPagando] = useState(false);
   const [copiado, setCopiado] = useState<number | null>(null);
 
-  const conDeuda = pedidos.filter(
-    (p) => p.estado !== "CANCELADO" && toNumber(p.restaPagar) > 0,
-  );
+  const conDeuda = pedidos.filter(tieneDeuda);
   const incluidos = incluirCurso
     ? conDeuda
     : conDeuda.filter((p) => p.estado === "LISTO" || p.estado === "ENTREGADO");

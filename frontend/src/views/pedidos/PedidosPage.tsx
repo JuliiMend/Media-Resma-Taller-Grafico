@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { api, fetcher, getErrorMessage } from "@/api/client";
 import { cn } from "@/lib/format";
+import { tieneDeuda } from "@/lib/deudas";
 import { Button, ConfirmDialog, ErrorBanner, LoadingState, PageHeader } from "@/components/ui";
 import type { Cliente, PaginaPedidos, Pedido, Producto, ResumenPedidos } from "@/types";
 import { DeudasTab } from "./DeudasTab";
@@ -290,7 +291,10 @@ export function PedidosPage() {
     }
   }
 
-  const deudaCount = resumen?.conDeuda ?? 0;
+  const deudaCount =
+    deudas && !deudasLoading
+      ? deudas.filter(tieneDeuda).length
+      : resumen?.conDeuda ?? 0;
   const tabs = [
     { value: "pedidos" as const, label: "Pedidos" },
     {

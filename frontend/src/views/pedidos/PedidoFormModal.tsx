@@ -7,6 +7,7 @@ import { PrecioConRecargo } from "@/components/PrecioConRecargo";
 import { SearchSelect } from "@/components/SearchSelect";
 import { ClienteQuickModal, ProductoQuickModal } from "@/components/QuickCreate";
 import { cn, formatMoney, toDateInput, toNumber } from "@/lib/format";
+import { UMBRAL_DEUDA } from "@/lib/deudas";
 import type { Cliente, Pedido, Producto } from "@/types";
 import { ESTADOS_PEDIDO } from "./estados";
 
@@ -326,7 +327,7 @@ export function PedidoFormModal({
             </div>
             <div>
               <dt className="text-xs text-muted">Resta pagar</dt>
-              <dd className={cn("font-semibold tabular-nums", resta > 0 ? "text-danger" : "text-success")}>{formatMoney(resta)}</dd>
+              <dd className={cn("font-semibold tabular-nums", resta >= UMBRAL_DEUDA ? "text-danger" : "text-success")}>{formatMoney(resta)}</dd>
             </div>
           </dl>
         )}
