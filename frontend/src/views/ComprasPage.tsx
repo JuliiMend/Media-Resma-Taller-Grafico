@@ -1,5 +1,6 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import useSWR from "swr";
+import { useSearchParams } from "react-router-dom";
 import { Plus, Search, Trash2 } from "lucide-react";
 import { api, fetcher, getErrorMessage } from "@/api/client";
 import {
@@ -40,6 +41,7 @@ export function ComprasPage() {
   const compras = useSWR<Compra[]>("/compras", fetcher);
   const insumos = useSWR<Insumo[]>("/insumos", fetcher);
   const registrar = useRegistrarHistorial();
+  const [params, setParams] = useSearchParams();
 
   const [query, setQuery] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -53,6 +55,23 @@ export function ComprasPage() {
   const [page, setPage] = useState(1);
   const [insumoModal, setInsumoModal] = useState(false);
   const [insumoCreado, setInsumoCreado] = useState<Insumo | null>(null);
+
+  const nuevoParam = params.get("nuevo");
+
+  useEffect(() => {
+    if (nuevoParam !== "1") return;
+    setForm(emptyForm());
+    setFormError(null);
+    setFormOpen(true);
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("nuevo");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [nuevoParam, setParams]);
 
   const insumosLista = useMemo(() => {
     const data = insumos.data ?? [];

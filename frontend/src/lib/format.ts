@@ -16,6 +16,18 @@ export function formatMoney(value: Decimal | null | undefined): string {
   return moneyFormatter.format(toNumber(value));
 }
 
+const moneyShortFormatter = new Intl.NumberFormat("es-AR", {
+  maximumFractionDigits: 0,
+  minimumFractionDigits: 0,
+});
+
+/** Monto sin decimales para tableros: "$251.500". */
+export function formatMoneyShort(value: Decimal | null | undefined): string {
+  const n = toNumber(value);
+  const texto = moneyShortFormatter.format(Math.abs(n));
+  return n < 0 ? `-$${texto}` : `$${texto}`;
+}
+
 const cantidadFormatter = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 });
 
 export function formatCantidad(value: Decimal | null | undefined): string {
