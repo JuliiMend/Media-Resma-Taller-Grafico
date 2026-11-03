@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { api, fetcher, getErrorMessage } from "@/api/client";
 import { useAuth } from "@/auth/AuthContext";
-import { Badge, Button, Card, ErrorBanner } from "@/components/ui";
+import { Badge, Button, Card, ErrorBanner, Modal } from "@/components/ui";
 import { nombreCliente } from "@/lib/clientes";
 import { tieneDeuda } from "@/lib/deudas";
 import {
@@ -865,6 +865,7 @@ export function DashboardPage() {
   const [alertError, setAlertError] = useState<string | null>(null);
   const [tareaError, setTareaError] = useState<string | null>(null);
   const [completando, setCompletando] = useState<Set<number>>(new Set());
+  const [paso, setPaso] = useState<null | "cartel" | "foto">(null);
 
   const pedidos = Array.isArray(pedidosData) ? pedidosData : [];
   const insumos = Array.isArray(insumosData) ? insumosData : [];
@@ -947,6 +948,12 @@ export function DashboardPage() {
     } finally {
       setTesting(false);
     }
+  }
+
+  function cerrarCartel() {
+    setPaso(null);
+    // Abre la foto recién cuando el cartel terminó de cerrarse.
+    window.setTimeout(() => setPaso("foto"), 0);
   }
 
   async function completarTarea(tarea: Tarea) {
@@ -1039,6 +1046,9 @@ export function DashboardPage() {
             title="Enviar prueba"
           >
             {!testing && <Send className="size-4" aria-hidden="true" />}
+          </Button>
+          <Button variant="danger" size="sm" onClick={() => setPaso("cartel")}>
+            No toques este botón
           </Button>
         </div>
       </header>
@@ -1151,6 +1161,44 @@ export function DashboardPage() {
           />
         </div>
       </div>
+
+      <Modal
+        open={paso === "cartel"}
+        onClose={cerrarCartel}
+        title="Sorpresa"
+        footer={
+          <div className="flex justify-end">
+            <Button variant="secondary" onClick={cerrarCartel}>
+              Cerrar
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-base">¡Te dije que no lo abras bro!</p>
+      </Modal>
+
+      <Modal
+        open={paso === "foto"}
+        onClose={() => setPaso(null)}
+        title="Conito"
+        size="lg"
+        footer={
+          <div className="flex justify-end">
+            <Button variant="secondary" onClick={() => setPaso(null)}>
+              Cerrar
+            </Button>
+          </div>
+        }
+      >
+        <div className="flex justify-center">
+          <img
+            src="/conito.jpg"
+            alt="Conito"
+            loading="lazy"
+            className="max-h-[80vh] max-w-full object-contain"
+          />
+        </div>
+      </Modal>
     </div>
   );
 }
