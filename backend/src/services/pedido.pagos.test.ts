@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { HttpError } from "../utils/http-error";
+import { normalizarResta, redondearMoneda } from "../utils/dinero";
 import { calcularPago, type DatosPago } from "./pedido.pagos";
 
 const trabajo = (cantidad: number, valorUnitario: number) => ({
@@ -161,6 +162,66 @@ const casos: Array<[string, () => void]> = [
           return true;
         },
       );
+    },
+  ],
+  [
+    "total 2299.9999999999995 con seña 2300 no genera deuda",
+    () => {
+      assert.equal(redondearMoneda(2299.9999999999995), 2300);
+      assert.throws(
+        () =>
+          calcularPago({
+            ...base,
+            trabajos: [trabajo(1, 2299.9999999999995)],
+            sena: 2300,
+          }),
+        (err: unknown) => {
+          assert.ok(err instanceof HttpError);
+          assert.equal(err.status, 409);
+          return true;
+        },
+      );
+    },
+  ],
+  [
+    "total con cantidad 18.46 × precio 100 se redondea a 1846",
+    () => {
+      const pago = calcularPago({
+        ...base,
+        trabajos: [trabajo(18.46, 100)],
+        sena: 46,
+      });
+      assert.deepEqual(pago, {
+        sena: 1846,
+        restaPagar: 0,
+        montoAplicado: 1800,
+      });
+    },
+  ],
+  [
+    "residuo 0.004 se normaliza a 0 y no cuenta como deuda",
+    () => {
+      assert.equal(normalizarResta(0.004), 0);
+      assert.throws(
+        () => calcularPago({ ...base, restaPagar: 0.004 }),
+        (err: unknown) => {
+          assert.ok(err instanceof HttpError);
+          assert.equal(err.status, 409);
+          assert.match(err.message, /no tiene saldo pendiente/i);
+          return true;
+        },
+      );
+    },
+  ],
+  [
+    "deuda real de 0.01 sí se cobra",
+    () => {
+      const pago = calcularPago({ ...base, restaPagar: 0.01 });
+      assert.deepEqual(pago, {
+        sena: 0.01,
+        restaPagar: 0,
+        montoAplicado: 0.01,
+      });
     },
   ],
 ];

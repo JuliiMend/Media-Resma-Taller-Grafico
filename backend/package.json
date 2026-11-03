@@ -14,6 +14,7 @@
     "test:reportes": "tsx src/services/reporte.calculos.test.ts",
     "test:deudas": "tsx src/services/pedido.pagos.test.ts",
     "auditar:deudas": "tsx scripts/auditar-deudas.ts",
+    "corregir:residuos": "tsx scripts/corregir-residuos-deuda.ts",
     "reproducir:pago-deuda": "tsx scripts/reproducir-pago-deuda.ts"
   },
   "dependencies": {

@@ -4,6 +4,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { api, fetcher, getErrorMessage } from "@/api/client";
 import { Badge, Button, ConfirmDialog, ErrorBanner, Field, Input, Modal, Select } from "@/components/ui";
 import { clienteDe, nombreCliente } from "@/lib/clientes";
+import { tieneDeuda } from "@/lib/deudas";
 import { cn, formatCantidad, formatDate, formatDateTime, formatMoney, toNumber } from "@/lib/format";
 import {
   AYUDA_MARGEN_RECARGO,
@@ -78,7 +79,7 @@ export function PedidoDetailModal({
   const resta = toNumber(pedido.restaPagar);
   const costoTotal = toNumber(pedido.costoTotal);
   const ganancia = toNumber(pedido.ganancia);
-  const saldado = resta <= 0;
+  const saldado = !tieneDeuda(pedido);
   const bloqueado = savingEstado || savingEstadoPedido;
   const clientesMap = cliente ? new Map<number, Cliente>([[cliente.id, cliente]]) : undefined;
   const nombreClienteMostrado = nombreCliente(pedido, clientesMap);

@@ -1,8 +1,13 @@
 import { HttpError } from "../utils/http-error";
+import {
+  normalizarResta,
+  redondearMoneda,
+  UMBRAL_DEUDA,
+} from "../utils/dinero";
 import { formatearMoneda } from "./historial.helper";
 
-/** Tolerancia para comparar montos con dos decimales. */
-export const TOLERANCIA_SALDO = 0.005;
+/** Tolerancia para aceptar centavos de más al comparar montos. */
+const TOLERANCIA_MONTO = 0.005;
 
 type TrabajoParaTotal = { cantidad: unknown; valorUnitario: unknown };
 
@@ -11,9 +16,6 @@ export const totalTrabajos = (trabajos: readonly TrabajoParaTotal[]) =>
     (acc, t) => acc + Number(t.cantidad) * Number(t.valorUnitario),
     0
   );
-
-const redondear = (valor: number) =>
-  Math.round((valor + Number.EPSILON) * 100) / 100;
 
 export interface PagoCalculado {
   /** Seña total después de aplicar el pago. */
@@ -52,17 +54,16 @@ export function calcularPago({
     throw new HttpError(409, "No se pueden registrar pagos de un pedido cancelado");
   }
 
-  const senaActual = redondear(Number(sena ?? 0));
+  const senaActual = redondearMoneda(Number(sena ?? 0));
+
+  const total = redondearMoneda(
+    totalTrabajos(trabajos) + Number(envio ?? 0)
+  );
 
   const saldo =
     trabajos.length > 0
-      ? redondear(
-          Math.max(
-            0,
-            totalTrabajos(trabajos) + Number(envio ?? 0) - senaActual
-          )
-        )
-      : redondear(Math.max(0, Number(restaPagar ?? 0)));
+      ? normalizarResta(total - senaActual)
+      : normalizarResta(Number(restaPagar ?? 0));
 
   if (monto !== undefined && monto !== null) {
     if (!Number.isFinite(monto) || monto <= 0) {
@@ -70,7 +71,7 @@ export function calcularPago({
     }
   }
 
-  if (saldo <= TOLERANCIA_SALDO) {
+  if (saldo < UMBRAL_DEUDA) {
     if (monto === undefined || monto === null) {
       throw new HttpError(409, "El pedido no tiene saldo pendiente");
     }
@@ -80,8 +81,8 @@ export function calcularPago({
     );
   }
 
-  const montoSolicitado = redondear(monto ?? saldo);
-  if (montoSolicitado - saldo > TOLERANCIA_SALDO) {
+  const montoSolicitado = redondearMoneda(monto ?? saldo);
+  if (montoSolicitado - saldo > TOLERANCIA_MONTO) {
     throw new HttpError(
       400,
       `El monto no puede superar el saldo pendiente (${formatearMoneda(saldo)})`
@@ -90,10 +91,10 @@ export function calcularPago({
 
   // Si el monto viene con centavos de más dentro de la tolerancia, se topa al saldo.
   const montoAplicado = Math.min(montoSolicitado, saldo);
-  const nuevoResta = redondear(Math.max(0, saldo - montoAplicado));
+  const nuevoResta = normalizarResta(saldo - montoAplicado);
 
   return {
-    sena: redondear(senaActual + montoAplicado),
+    sena: redondearMoneda(senaActual + montoAplicado),
     restaPagar: nuevoResta,
     montoAplicado,
   };

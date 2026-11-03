@@ -6,6 +6,7 @@ import { api, fetcher, getErrorMessage } from "@/api/client";
 import { useAuth } from "@/auth/AuthContext";
 import { Badge, Button, Card, ErrorBanner, PageHeader } from "@/components/ui";
 import { nombreCliente } from "@/lib/clientes";
+import { tieneDeuda } from "@/lib/deudas";
 import { cn, formatDate, formatMoney, toDateInput, toNumber } from "@/lib/format";
 import type { Insumo, Pedido, Tarea } from "@/types";
 import { ESTADOS_PEDIDO } from "./pedidos/estados";
@@ -364,9 +365,9 @@ export function DashboardPage() {
   const [alertError, setAlertError] = useState<string | null>(null);
 
   const activos = pedidos.filter(esActivo);
-  const saldo = pedidos.filter((p) => p.estado !== "CANCELADO").reduce((s, p) => s + toNumber(p.restaPagar), 0);
+  const saldo = pedidos.filter(tieneDeuda).reduce((s, p) => s + toNumber(p.restaPagar), 0);
   const deudas = pedidos.filter(
-    (p) => (p.estado === "LISTO" || p.estado === "ENTREGADO") && toNumber(p.restaPagar) > 0,
+    (p) => (p.estado === "LISTO" || p.estado === "ENTREGADO") && tieneDeuda(p),
   );
   const saldoDeudas = deudas.reduce((s, p) => s + toNumber(p.restaPagar), 0);
 

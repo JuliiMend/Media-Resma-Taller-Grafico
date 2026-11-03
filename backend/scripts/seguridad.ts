@@ -26,8 +26,7 @@ export function exigirBaseLocal(permitirRemoto = false): string {
   if (!local && !permitirRemoto) {
     console.error(
       `DATABASE_URL apunta a "${hostname}", que no es local.\n` +
-        "Este script no se ejecuta contra una base remota. " +
-        "Usá una base local o pasá --permitir-remoto si sabés lo que hacés."
+        "Este script no se ejecuta contra una base remota. Usá una base local."
     );
     process.exit(1);
   }

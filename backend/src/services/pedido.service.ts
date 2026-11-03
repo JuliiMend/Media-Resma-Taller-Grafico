@@ -4,6 +4,10 @@ import { PedidoFiltros, pedidoRepository } from "../repositories/pedido.reposito
 import { CrearPedidoInput, ActualizarPedidoInput } from "../schemas/pedido.schema";
 import { HttpError } from "../utils/http-error";
 import {
+  normalizarResta,
+  redondearMoneda,
+} from "../utils/dinero";
+import {
   describirCambios,
   ETIQUETAS_PEDIDO,
   formatearMoneda,
@@ -60,8 +64,10 @@ const recalcularPedido = async (
   if (!pedido) throw new Error("Pedido no encontrado");
   if (pedido.trabajos.length === 0) return pedido;
 
-  const total = totalTrabajos(pedido.trabajos) + Number(pedido.envio ?? 0);
-  const restaPagar = Math.max(0, total - Number(pedido.sena ?? 0));
+  const total = redondearMoneda(
+    totalTrabajos(pedido.trabajos) + Number(pedido.envio ?? 0)
+  );
+  const restaPagar = normalizarResta(total - Number(pedido.sena ?? 0));
 
   return db.pedido.update({ where: { id: pedidoId }, data: { restaPagar } });
 };
@@ -118,16 +124,27 @@ export const pedidoService = {
   crear: async (data: CrearPedidoInput) => {
     const { trabajos = [], ...pedidoData } = data;
 
-    const totalPedido = totalTrabajos(trabajos) + Number(pedidoData.envio ?? 0);
-    if (Number(pedidoData.sena ?? 0) > totalPedido) {
+    const totalPedido = redondearMoneda(
+      totalTrabajos(trabajos) + Number(pedidoData.envio ?? 0)
+    );
+    const sena = redondearMoneda(Number(pedidoData.sena ?? 0));
+    if (sena > totalPedido) {
       throw new HttpError(
         400,
         `La seña no puede superar el total del pedido (${formatearMoneda(totalPedido)})`
       );
     }
 
+    const datosPedido = {
+      ...pedidoData,
+      sena,
+      ...(pedidoData.restaPagar !== undefined && pedidoData.restaPagar !== null
+        ? { restaPagar: normalizarResta(Number(pedidoData.restaPagar)) }
+        : {}),
+    };
+
     return prisma.$transaction(async (tx) => {
-      const pedido = await tx.pedido.create({ data: pedidoData });
+      const pedido = await tx.pedido.create({ data: datosPedido });
 
       for (const trabajo of trabajos) {
         let costoUnitario: Prisma.Decimal | number | null =
@@ -194,13 +211,28 @@ export const pedidoService = {
       });
       if (!antes) throw new HttpError(404, "Pedido no encontrado");
 
-      if (data.sena !== undefined && data.sena !== null) {
+      const sena =
+        data.sena !== undefined && data.sena !== null
+          ? redondearMoneda(Number(data.sena))
+          : data.sena;
+      const restaPagar =
+        data.restaPagar !== undefined && data.restaPagar !== null
+          ? normalizarResta(Number(data.restaPagar))
+          : data.restaPagar;
+
+      const datos: ActualizarPedidoInput = {
+        ...data,
+        ...(data.sena !== undefined ? { sena } : {}),
+        ...(data.restaPagar !== undefined ? { restaPagar } : {}),
+      };
+
+      if (typeof sena === "number") {
         const envio =
           data.envio !== undefined
             ? Number(data.envio ?? 0)
             : Number(antes.envio ?? 0);
-        const total = totalTrabajos(antes.trabajos) + envio;
-        if (Number(data.sena) > total) {
+        const total = redondearMoneda(totalTrabajos(antes.trabajos) + envio);
+        if (sena > total) {
           throw new HttpError(
             400,
             `La seña no puede superar el total del pedido (${formatearMoneda(total)})`
@@ -208,15 +240,15 @@ export const pedidoService = {
         }
       }
 
-      await tx.pedido.update({ where: { id }, data });
+      await tx.pedido.update({ where: { id }, data: datos });
       await recalcularPedido(id, tx);
       const pedido = await buscarConDetalles(tx, id);
 
-      const cambios = describirCambios(antes, data, ETIQUETAS_PEDIDO);
+      const cambios = describirCambios(antes, datos, ETIQUETAS_PEDIDO);
       if (cambios) {
         await registrarHistorial(tx, {
           accion:
-            data.estado !== undefined && data.estado !== antes.estado
+            datos.estado !== undefined && datos.estado !== antes.estado
               ? "CAMBIO_ESTADO"
               : "EDITAR",
           entidad: "pedido",

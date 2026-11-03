@@ -3,6 +3,7 @@ import useSWR from "swr";
 import { Search } from "lucide-react";
 import { fetcher } from "@/api/client";
 import { clientePendiente, nombreCliente } from "@/lib/clientes";
+import { tieneDeuda } from "@/lib/deudas";
 import { cn, formatDate, formatMoney, toNumber } from "@/lib/format";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { useUrlParams, useUrlSort } from "@/lib/url-state";
@@ -171,7 +172,7 @@ export function PedidosTab({
 
   const debeCell = (p: Pedido) => {
     const resta = toNumber(p.restaPagar);
-    if (p.estado === "CANCELADO" || resta <= 0) return <span className="text-muted">—</span>;
+    if (!tieneDeuda(p)) return <span className="text-muted">—</span>;
     return <span className="font-semibold text-danger tabular-nums">{formatMoney(resta)}</span>;
   };
 
@@ -456,7 +457,7 @@ export function PedidosTab({
                         <span className="text-muted">·</span>
                         <span className="font-medium">{clienteCell(p)}</span>
                         <Badge tone={estado.tone}>{estado.label}</Badge>
-                        {resta > 0 && p.estado !== "CANCELADO" && (
+                        {tieneDeuda(p) && (
                           <Badge tone="danger">Debe {formatMoney(resta)}</Badge>
                         )}
                       </div>
@@ -479,10 +480,10 @@ export function PedidosTab({
                       <p
                         className={cn(
                           "mt-1 text-xs tabular-nums",
-                          resta > 0 && p.estado !== "CANCELADO" ? "text-danger" : "text-muted",
+                          tieneDeuda(p) ? "text-danger" : "text-muted",
                         )}
                       >
-                        {resta > 0 && p.estado !== "CANCELADO"
+                        {tieneDeuda(p)
                           ? `Debe ${formatMoney(resta)}`
                           : "Sin deuda"}
                       </p>
