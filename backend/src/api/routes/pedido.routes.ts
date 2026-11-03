@@ -7,6 +7,7 @@ export const pedidoRouter = Router();
 
 pedidoRouter.get("/", pedidoController.listar);
 pedidoRouter.get("/resumen", pedidoController.resumen);
+pedidoRouter.get("/deudas", pedidoController.deudas);
 pedidoRouter.get("/:id", pedidoController.obtener);
 pedidoRouter.post("/", pedidoController.crear);
 pedidoRouter.post("/:id/pagos", validate(pagoPedidoSchema), pedidoController.pagar);

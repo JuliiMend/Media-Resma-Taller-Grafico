@@ -42,10 +42,16 @@ export interface TotalesPresupuesto {
   total: number;
   /** Subtotal ya descontado (sin envío): base del margen. */
   baseConDescuento: number;
+  /** Base con descuento solo de las líneas que tienen costo cargado. */
+  baseConCosto: number;
   costoTotal: number;
   ganancia: number;
-  /** Margen % sobre la base con descuento. null si la base es 0. */
+  /** Margen % sobre la venta de las líneas con costo. null si la base es 0. */
   margen: number | null;
+  /** Recargo % sobre el costo. null si no hay costo cargado. */
+  recargo: number | null;
+  /** false si alguna línea válida no tiene costo cargado. */
+  costoCompleto: boolean;
   /** Cantidad de líneas cuyo precio está por debajo del costo. */
   lineasBajoCosto: number;
   /** El total con descuento está por debajo del costo total. */
@@ -179,16 +185,29 @@ export function calcularTotales(borrador: BorradorPresupuesto): TotalesPresupues
   const baseConDescuento = subtotal - descuento;
 
   let costoTotal = 0;
+  let subtotalConCosto = 0;
   let lineasBajoCosto = 0;
+  let lineasSinCosto = 0;
   for (const l of lineas) {
-    if (l.costoUnitario === "") continue;
+    if (l.costoUnitario === "") {
+      lineasSinCosto += 1;
+      continue;
+    }
     const costo = toNumber(l.costoUnitario);
-    costoTotal += costo * toNumber(l.cantidad);
-    if (toNumber(l.precioUnitario) < costo) lineasBajoCosto += 1;
+    const cantidad = toNumber(l.cantidad);
+    const precio = toNumber(l.precioUnitario);
+    costoTotal += costo * cantidad;
+    subtotalConCosto += precio * cantidad;
+    if (precio < costo) lineasBajoCosto += 1;
   }
 
-  const ganancia = baseConDescuento - costoTotal;
-  const margen = baseConDescuento > 0 ? (ganancia / baseConDescuento) * 100 : null;
+  // El descuento global se reparte proporcionalmente también sobre las líneas
+  // con costo, para no mezclar la ganancia con líneas sin costo cargado.
+  const factorDescuento = subtotal > 0 ? baseConDescuento / subtotal : 0;
+  const baseConCosto = subtotalConCosto * factorDescuento;
+  const ganancia = baseConCosto - costoTotal;
+  const margen = baseConCosto > 0 ? (ganancia / baseConCosto) * 100 : null;
+  const recargo = costoTotal > 0 ? (ganancia / costoTotal) * 100 : null;
 
   return {
     subtotal,
@@ -196,9 +215,12 @@ export function calcularTotales(borrador: BorradorPresupuesto): TotalesPresupues
     envio,
     total,
     baseConDescuento,
+    baseConCosto,
     costoTotal,
     ganancia,
     margen,
+    recargo,
+    costoCompleto: lineasSinCosto === 0,
     lineasBajoCosto,
     totalBajoCosto: costoTotal > 0 && baseConDescuento < costoTotal,
   };

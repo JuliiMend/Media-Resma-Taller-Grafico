@@ -9,29 +9,41 @@ import {
   formatearMoneda,
   registrarHistorial,
 } from "./historial.helper";
+import { calcularPago, totalTrabajos } from "./pedido.pagos";
 
 type PedidoConDetalles = Prisma.PedidoGetPayload<{
   include: { cliente: true; trabajos: true };
 }>;
 
-const totalTrabajos = (trabajos: { cantidad: unknown; valorUnitario: unknown }[]) =>
-  trabajos.reduce(
-    (acc, t) => acc + Number(t.cantidad) * Number(t.valorUnitario),
+export function conTotales(pedido: PedidoConDetalles) {
+  const totalTrabajosPedido = totalTrabajos(pedido.trabajos);
+  const total = totalTrabajosPedido + Number(pedido.envio ?? 0);
+  const trabajosConCosto = pedido.trabajos.filter(
+    (t) => t.costoUnitario !== null && t.costoUnitario !== undefined
+  );
+  const ventaConCosto = totalTrabajos(trabajosConCosto);
+  const costoTotal = trabajosConCosto.reduce(
+    (acc, t) => acc + Number(t.cantidad) * Number(t.costoUnitario),
     0
   );
-
-export function conTotales(pedido: PedidoConDetalles) {
-  const total = totalTrabajos(pedido.trabajos);
-  const costoTotal = pedido.trabajos.reduce(
-    (acc, t) => acc + Number(t.cantidad) * Number(t.costoUnitario ?? 0),
-    0
+  // La ganancia y el margen solo se calculan sobre trabajos con costo cargado.
+  // Si falta algún costo no se asume 0: se marca costoCompleto = false.
+  const ganancia = ventaConCosto - costoTotal;
+  const margen = ventaConCosto > 0 ? (ganancia / ventaConCosto) * 100 : null;
+  const recargo = costoTotal > 0 ? (ganancia / costoTotal) * 100 : null;
+  const costoCompleto = pedido.trabajos.every(
+    (t) => t.costoUnitario !== null && t.costoUnitario !== undefined
   );
 
   return {
     ...pedido,
-    total: total + Number(pedido.envio ?? 0),
+    total,
+    ventaConCosto,
     costoTotal,
-    ganancia: total - costoTotal,
+    ganancia,
+    margen,
+    recargo,
+    costoCompleto,
   };
 }
 
@@ -72,6 +84,16 @@ const describirCantidadTrabajos = (cantidad: number) =>
 export const pedidoService = {
   listar: async (filtros: PedidoFiltros = {}) =>
     (await pedidoRepository.findAll(filtros)).map(conTotales),
+
+  /** Pedidos con saldo pendiente, sin cancelados, para la pestaña Deudas. */
+  listarDeudas: async () =>
+    (
+      await pedidoRepository.findAll({
+        soloDeuda: true,
+        orden: "fecha",
+        dir: "asc",
+      })
+    ).map(conTotales),
 
   listarPaginado: async (page: number, pageSize: number, filtros: PedidoFiltros = {}) => {
     const { data, total } = await pedidoRepository.findAllPaginated(page, pageSize, filtros);
@@ -213,31 +235,31 @@ export const pedidoService = {
         where: { id },
         include: { trabajos: true },
       });
-      if (!pedido) throw new Error("Pedido no encontrado");
-      if (pedido.estado === "CANCELADO") {
-        throw new HttpError(409, "No se pueden registrar pagos de un pedido cancelado");
-      }
+      if (!pedido) throw new HttpError(404, "Pedido no encontrado");
 
-      const total = totalTrabajos(pedido.trabajos) + Number(pedido.envio ?? 0);
-      const senaActual = Number(pedido.sena ?? 0);
-      const saldoRestante = Math.max(0, total - senaActual);
-      const montoAPagar = monto ?? saldoRestante;
-      const tope = Math.max(total, senaActual);
-      const nuevaSena = Math.min(senaActual + montoAPagar, tope);
+      const pago = calcularPago({
+        estado: pedido.estado,
+        trabajos: pedido.trabajos,
+        envio: pedido.envio,
+        sena: pedido.sena,
+        restaPagar: pedido.restaPagar,
+        monto,
+      });
 
+      // Se actualizan seña y resta juntas: no se depende de recalcularPedido,
+      // que no recalcula pedidos sin trabajos.
       await tx.pedido.update({
         where: { id },
-        data: { sena: nuevaSena },
+        data: { sena: pago.sena, restaPagar: pago.restaPagar },
       });
-      const actualizado = await recalcularPedido(id, tx);
 
       await registrarHistorial(tx, {
         accion: "EDITAR",
         entidad: "pedido",
         entidadId: id,
         detalle:
-          `Registró un pago de ${formatearMoneda(nuevaSena - senaActual)}. ` +
-          `Resta ${formatearMoneda(actualizado.restaPagar)}`,
+          `Registró un pago de ${formatearMoneda(pago.montoAplicado)}. ` +
+          `Resta ${formatearMoneda(pago.restaPagar)}`,
       });
 
       return buscarConDetalles(tx, id);

@@ -16,6 +16,7 @@ export interface Compra {
   cantidad: Decimal;
   precio: Decimal;
   medioPago?: string | null;
+  insumo?: { nombre: string; unidad: string };
 }
 
 export interface HistorialEntry {
@@ -96,8 +97,12 @@ export interface Pedido {
   cliente?: Cliente;
   trabajos?: Trabajo[];
   total?: Decimal | null;
+  ventaConCosto?: Decimal | null;
   costoTotal?: Decimal | null;
   ganancia?: Decimal | null;
+  margen?: Decimal | null;
+  recargo?: Decimal | null;
+  costoCompleto?: boolean;
 }
 
 export interface PaginaPedidos {
@@ -114,7 +119,6 @@ export interface ResumenPedidos {
 }
 
 export interface FilaVenta {
-  mes: string;
   productoId: number | null;
   producto: string;
   unidad: string;
@@ -122,6 +126,80 @@ export interface FilaVenta {
   ingresos: Decimal;
   costo: Decimal;
   ganancia: Decimal;
+  margen: number | null;
+  costoCompleto: boolean;
+  trabajosSinCosto: number;
+}
+
+export interface FilaRanking extends FilaVenta {
+  gananciaUnidad: number | null;
+  porcentajeGanancia: number | null;
+}
+
+export interface PaginaRanking {
+  data: FilaRanking[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface TotalesReporte {
+  ingresos: Decimal;
+  costo: Decimal;
+  ganancia: Decimal;
+  margen: number | null;
+  pedidos: number;
+  costoCompleto: boolean;
+  trabajosSinCosto: number;
+}
+
+export interface VariacionReporte {
+  ingresos: number | null;
+  costo: number | null;
+  ganancia: number | null;
+}
+
+export interface ResumenReporte {
+  actual: TotalesReporte;
+  anterior: TotalesReporte | null;
+  variacion: VariacionReporte | null;
+}
+
+export interface GastoPorCategoria {
+  categoria: string;
+  monto: Decimal;
+}
+
+export interface BalanceResumen {
+  ingresos: Decimal;
+  costoTrabajos: Decimal;
+  gananciaBruta: Decimal;
+  gastos: Decimal;
+  comprasInsumos: Decimal;
+  resultado: Decimal;
+  cajaEstimada: Decimal;
+  costoCompleto: boolean;
+  trabajosSinCosto: number;
+}
+
+export interface VariacionBalance {
+  ingresos: number | null;
+  costoTrabajos: number | null;
+  gananciaBruta: number | null;
+  gastos: number | null;
+  comprasInsumos: number | null;
+  resultado: number | null;
+  cajaEstimada: number | null;
+}
+
+export interface BalanceReporte {
+  actual: BalanceResumen;
+  anterior: BalanceResumen | null;
+  variacion: VariacionBalance | null;
+  gastosPorCategoria: GastoPorCategoria[];
+  compras: Compra[];
+  gastos: Gasto[];
+  margen?: number | null;
 }
 
 export interface Tarea {

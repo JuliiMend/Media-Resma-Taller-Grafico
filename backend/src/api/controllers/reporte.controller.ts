@@ -1,19 +1,52 @@
 import { Request, Response } from "express";
+import { z, type ZodTypeAny } from "zod";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { reporteService } from "../../services/reporte.service";
-import { ventasQuerySchema } from "../../schemas/reporte.schema";
+import {
+  balanceQuerySchema,
+  rankingQuerySchema,
+  resumenQuerySchema,
+  ventasQuerySchema,
+} from "../../schemas/reporte.schema";
+
+function parsear<T extends ZodTypeAny>(
+  schema: T,
+  req: Request,
+  res: Response,
+): z.infer<T> | null {
+  const resultado = schema.safeParse(req.query);
+  if (!resultado.success) {
+    res.status(400).json({
+      error: "Parámetros inválidos",
+      detalles: resultado.error.flatten(),
+    });
+    return null;
+  }
+  return resultado.data as z.infer<T>;
+}
 
 export const reporteController = {
   ventas: asyncHandler(async (req: Request, res: Response) => {
-    const resultado = ventasQuerySchema.safeParse(req.query);
+    const query = parsear(ventasQuerySchema, req, res);
+    if (!query) return;
+    res.json(await reporteService.ventas(query));
+  }),
 
-    if (!resultado.success) {
-      return res.status(400).json({
-        error: "Parámetros inválidos",
-        detalles: resultado.error.flatten(),
-      });
-    }
+  resumen: asyncHandler(async (req: Request, res: Response) => {
+    const query = parsear(resumenQuerySchema, req, res);
+    if (!query) return;
+    res.json(await reporteService.resumen(query));
+  }),
 
-    res.json(await reporteService.ventas(resultado.data));
+  ranking: asyncHandler(async (req: Request, res: Response) => {
+    const query = parsear(rankingQuerySchema, req, res);
+    if (!query) return;
+    res.json(await reporteService.ranking(query));
+  }),
+
+  balance: asyncHandler(async (req: Request, res: Response) => {
+    const query = parsear(balanceQuerySchema, req, res);
+    if (!query) return;
+    res.json(await reporteService.balance(query));
   }),
 };

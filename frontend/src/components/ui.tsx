@@ -282,6 +282,7 @@ export function ConfirmDialog({
   cancelLabel = "Cancelar",
   secondaryLabel,
   confirmVariant,
+  children,
 }: {
   open: boolean;
   title: string;
@@ -294,6 +295,7 @@ export function ConfirmDialog({
   cancelLabel?: string;
   secondaryLabel?: string;
   confirmVariant?: "danger" | "primary";
+  children?: ReactNode;
 }) {
   return (
     <Modal
@@ -317,6 +319,7 @@ export function ConfirmDialog({
       }
     >
       <p className="text-sm text-muted text-pretty">{message}</p>
+      {children}
     </Modal>
   );
 }

@@ -35,6 +35,8 @@ export interface FieldDef {
   suggestions?: string[];
   /** Para campos numéricos: envía null cuando el valor está vacío (limpia el dato). */
   nullable?: boolean;
+  /** El campo se envía en el payload pero no se dibuja (se reemplaza con formExtra). */
+  hidden?: boolean;
 }
 
 export interface ColumnDef<T> {
@@ -58,6 +60,11 @@ interface CrudPageProps<T extends { id: number; activo?: boolean }> {
   toolbar?: ReactNode;
   /** Resumen en vivo dentro del formulario (ej. ganancia y margen de un producto). */
   formSummary?: (values: FormValues) => ReactNode;
+  /** Controles personalizados que reemplazan campos ocultos (ej. costo + % → precio). */
+  formExtra?: (
+    values: FormValues,
+    setValue: (name: string, value: string | boolean) => void,
+  ) => ReactNode;
   /** Cantidad de filas por página (por defecto 10). */
   perPage?: number;
 }
@@ -103,6 +110,7 @@ export function CrudPage<T extends { id: number; activo?: boolean }>({
   predicate,
   toolbar,
   formSummary,
+  formExtra,
   perPage = PAGE_SIZE,
 }: CrudPageProps<T>) {
   const { data, error, isLoading, mutate } = useSWR<T[]>(endpoint, fetcher);
@@ -139,6 +147,10 @@ export function CrudPage<T extends { id: number; activo?: boolean }>({
     setValues(itemToForm(item, fields));
     setFormError(null);
     setFormOpen(true);
+  }
+
+  function setField(name: string, value: string | boolean) {
+    setValues((actual) => ({ ...actual, [name]: value }));
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -376,7 +388,7 @@ export function CrudPage<T extends { id: number; activo?: boolean }>({
       <Modal open={formOpen} onClose={() => setFormOpen(false)} title={editing ? `Editar ${singular}` : `Nuevo ${singular}`}>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            {fields.map((f) => {
+            {fields.filter((f) => !f.hidden).map((f) => {
               const id = `field-${f.name}`;
               const value = values[f.name];
               if (f.type === "checkbox") {
@@ -437,6 +449,7 @@ export function CrudPage<T extends { id: number; activo?: boolean }>({
               );
             })}
           </div>
+          {formExtra?.(values, setField)}
           {formSummary?.(values)}
           {formError && <ErrorBanner message={formError} />}
           <div className="flex justify-end gap-2 pt-2">

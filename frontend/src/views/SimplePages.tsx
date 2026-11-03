@@ -1,7 +1,15 @@
 import { AlertTriangle } from "lucide-react";
 import { CrudPage } from "@/components/CrudPage";
+import { PrecioConRecargo } from "@/components/PrecioConRecargo";
 import { Badge } from "@/components/ui";
 import { formatMoney, toNumber } from "@/lib/format";
+import {
+  AYUDA_MARGEN_RECARGO,
+  formatPorcentaje,
+  gananciaUnitaria,
+  margenSobreVenta,
+  recargoDesdePrecio,
+} from "@/lib/precio";
 import { UNIDADES_PRODUCTO } from "@/lib/unidades";
 import type { Cliente, Insumo, Producto } from "@/types";
 
@@ -23,7 +31,7 @@ export function ClientesPage() {
         { label: "Nombre", render: (c) => c.nombre, primary: true },
         { label: "Teléfono", render: (c) => c.telefono || "—" },
         { label: "Contacto", render: (c) => c.userContacto || "—" },
-        { label: "Notas", render: (c) => <span className="line-clamp-1 text-muted">{c.notas || "—"}</span> },
+        { label: "Notas", render: (c) => <span className="line-clamp-1 text-muted" title={c.notas || undefined}>{c.notas || "—"}</span> },
       ]}
     />
   );
@@ -78,8 +86,6 @@ export function InsumosPage() {
   );
 }
 
-const margenFormatter = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 });
-
 function costoDe(p: Producto): number | null {
   return p.costo === null || p.costo === undefined ? null : toNumber(p.costo);
 }
@@ -105,8 +111,8 @@ export function ProductosPage() {
             { value: "TERCERIZADO", label: "Tercerizado" },
           ],
         },
-        { name: "precioVenta", label: "Precio de venta", type: "number", required: true },
-        { name: "costo", label: "Costo", type: "number", nullable: true },
+        { name: "precioVenta", label: "Precio de venta", type: "number", required: true, hidden: true },
+        { name: "costo", label: "Costo", type: "number", nullable: true, hidden: true },
         {
           name: "unidad",
           label: "Unidad",
@@ -118,31 +124,18 @@ export function ProductosPage() {
         { name: "descripcion", label: "Descripción", type: "textarea" },
         { name: "activo", label: "Producto activo", type: "checkbox", defaultValue: true },
       ]}
-      formSummary={(values) => {
-        const precio = values.precioVenta === "" ? null : Number(values.precioVenta);
-        const costo = values.costo === "" ? null : Number(values.costo);
-        const disponible = precio !== null && costo !== null && Number.isFinite(precio) && Number.isFinite(costo);
-        const ganancia = disponible ? (precio as number) - (costo as number) : null;
-        const margen = disponible && (precio as number) > 0 ? ((ganancia as number) / (precio as number)) * 100 : null;
-        return (
-          <dl className="grid grid-cols-3 gap-4 rounded-lg bg-background p-4 text-sm">
-            <div>
-              <dt className="text-xs text-muted">Precio de venta</dt>
-              <dd className="font-semibold tabular-nums">{precio === null ? "—" : formatMoney(precio)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted">Ganancia</dt>
-              <dd className={ganancia !== null && ganancia < 0 ? "font-semibold tabular-nums text-danger" : "font-semibold tabular-nums text-success"}>
-                {ganancia === null ? "—" : formatMoney(ganancia)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted">Margen</dt>
-              <dd className="font-semibold tabular-nums">{margen === null ? "—" : `${margenFormatter.format(margen)} %`}</dd>
-            </div>
-          </dl>
-        );
-      }}
+      formExtra={(values, setValue) => (
+        <PrecioConRecargo
+          idPrefix="producto"
+          costo={String(values.costo ?? "")}
+          precio={String(values.precioVenta ?? "")}
+          onChangeCosto={(valor) => setValue("costo", valor)}
+          onChangePrecio={(valor) => setValue("precioVenta", valor)}
+          costoLabel="Costo"
+          precioLabel="Precio de venta"
+          precioRequired
+        />
+      )}
       columns={[
         { label: "Nombre", render: (p) => p.nombre, primary: true },
         { label: "Tipo", render: (p) => <Badge tone={p.tipo === "PROPIO" ? "primary" : "neutral"}>{p.tipo === "PROPIO" ? "Propio" : "Tercerizado"}</Badge> },
@@ -160,17 +153,33 @@ export function ProductosPage() {
           align: "right",
           render: (p) => {
             const costo = costoDe(p);
-            return costo === null ? "—" : formatMoney(toNumber(p.precioVenta) - costo);
+            return costo === null ? "—" : formatMoney(gananciaUnitaria(costo, toNumber(p.precioVenta)));
           },
         },
         {
-          label: "Margen",
+          label: "Recargo s/ costo",
           align: "right",
           render: (p) => {
             const costo = costoDe(p);
-            const precio = toNumber(p.precioVenta);
-            if (costo === null || precio <= 0) return "—";
-            return `${margenFormatter.format(((precio - costo) / precio) * 100)} %`;
+            if (costo === null) return "—";
+            return (
+              <span title={AYUDA_MARGEN_RECARGO}>
+                {formatPorcentaje(recargoDesdePrecio(costo, toNumber(p.precioVenta)))}
+              </span>
+            );
+          },
+        },
+        {
+          label: "Margen s/ venta",
+          align: "right",
+          render: (p) => {
+            const costo = costoDe(p);
+            if (costo === null) return "—";
+            return (
+              <span title={AYUDA_MARGEN_RECARGO}>
+                {formatPorcentaje(margenSobreVenta(costo, toNumber(p.precioVenta)))}
+              </span>
+            );
           },
         },
         { label: "Estado", render: (p) => <Badge tone={p.activo ? "success" : "neutral"}>{p.activo ? "Activo" : "Archivado"}</Badge> },

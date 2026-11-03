@@ -22,6 +22,12 @@ export interface PedidoResumen {
   conDeuda: number;
 }
 
+/** Condición única de deuda: ni cancelado ni saldado. */
+export const whereDeuda: Prisma.PedidoWhereInput = {
+  estado: { not: "CANCELADO" },
+  restaPagar: { gt: 0 },
+};
+
 const buildWhere = (filtros: PedidoFiltros = {}): Prisma.PedidoWhereInput => {
   const condiciones: Prisma.PedidoWhereInput[] = [];
 
@@ -43,7 +49,7 @@ const buildWhere = (filtros: PedidoFiltros = {}): Prisma.PedidoWhereInput => {
     });
   }
   if (filtros.soloDeuda) {
-    condiciones.push({ estado: { not: "CANCELADO" }, restaPagar: { gt: 0 } });
+    condiciones.push(whereDeuda);
   }
   if (filtros.entregaDesde !== undefined || filtros.entregaHasta !== undefined) {
     condiciones.push({
@@ -57,6 +63,7 @@ const buildWhere = (filtros: PedidoFiltros = {}): Prisma.PedidoWhereInput => {
     condiciones.push({
       OR: [
         { cliente: { nombre: { contains: filtros.q, mode: "insensitive" } } },
+        { observaciones: { contains: filtros.q, mode: "insensitive" } },
         { trabajos: { some: { descripcion: { contains: filtros.q, mode: "insensitive" } } } },
         {
           trabajos: {
@@ -127,10 +134,7 @@ export const pedidoRepository = {
 
   findConSaldo: () =>
     prisma.pedido.findMany({
-      where: {
-        restaPagar: { gt: 0 },
-        estado: { not: "CANCELADO" },
-      },
+      where: whereDeuda,
       orderBy: { fecha: "asc" },
       include: { cliente: true },
     }),
@@ -155,7 +159,7 @@ export const pedidoRepository = {
     >(Prisma.sql`
       SELECT
         COUNT(*) FILTER (WHERE "estado" NOT IN ('ENTREGADO', 'CANCELADO'))::int AS "activos",
-        COALESCE(SUM("restaPagar") FILTER (WHERE "estado" <> 'CANCELADO'), 0)::float8 AS "saldoPendiente",
+        COALESCE(SUM("restaPagar") FILTER (WHERE "estado" <> 'CANCELADO' AND COALESCE("restaPagar", 0) > 0), 0)::float8 AS "saldoPendiente",
         COUNT(*) FILTER (WHERE "estado" <> 'CANCELADO' AND COALESCE("restaPagar", 0) > 0)::int AS "conDeuda"
       FROM "Pedido"
     `);

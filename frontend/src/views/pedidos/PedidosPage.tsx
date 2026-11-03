@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import useSWR from "swr";
+import useSWR, { mutate as mutateGlobal } from "swr";
 import { useSearchParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { api, fetcher, getErrorMessage } from "@/api/client";
@@ -62,12 +62,12 @@ export function PedidosPage() {
     error: deudasError,
     isLoading: deudasLoading,
     mutate: mutateDeudas,
-  } = useSWR<Pedido[]>(vista === "deudas" ? "/pedidos" : null, fetcher);
-  const { data: resumen, mutate: mutateResumen } = useSWR<ResumenPedidos>(
-    "/pedidos/resumen",
+  } = useSWR<Pedido[]>(vista === "deudas" ? "/pedidos/deudas" : null, fetcher);
+  const { data: resumen } = useSWR<ResumenPedidos>("/pedidos/resumen", fetcher);
+  const { data: clientes, isLoading: clientesCargando } = useSWR<Cliente[]>(
+    "/clientes?incluirInactivos=true",
     fetcher,
   );
-  const { data: clientes } = useSWR<Cliente[]>("/clientes", fetcher);
   const { data: productos } = useSWR<Producto[]>("/productos", fetcher);
 
   const [formOpen, setFormOpen] = useState(false);
@@ -123,11 +123,26 @@ export function PedidosPage() {
     );
   }, [pagina, page, pageSize, setParams]);
 
-  function refrescar() {
-    void mutatePedidos();
-    void mutateDeudas();
-    void mutateResumen();
-    void mutateSelectedPedido();
+  function revalidarTodo() {
+    void mutateGlobal(
+      (key) =>
+        typeof key === "string" &&
+        (key.startsWith("/pedidos") ||
+          key.startsWith("/dashboard") ||
+          key.startsWith("/reportes")),
+      undefined,
+      { revalidate: true },
+    );
+  }
+
+  function refrescar(pedidoPagadoId?: number) {
+    if (pedidoPagadoId != null) {
+      void mutateDeudas(
+        (actual) => actual?.filter((pedido) => pedido.id !== pedidoPagadoId),
+        { revalidate: false },
+      );
+    }
+    revalidarTodo();
   }
 
   function cambiarVista(next: "pedidos" | "deudas") {
@@ -213,10 +228,7 @@ export function PedidosPage() {
       if (cobrar) await api.post(`/pedidos/${pedidoId}/pagos`);
       await api.patch(`/pedidos/${pedidoId}`, { estado: nuevoEstado });
 
-      void mutatePedidos();
-      void mutateDeudas();
-      void mutateSelectedPedido();
-      void mutateResumen();
+      revalidarTodo();
     } catch (err) {
       if (estadoAnterior !== undefined) {
         if (vista === "pedidos") {
@@ -345,6 +357,7 @@ export function PedidosPage() {
         <DeudasTab
           pedidos={list}
           clientesById={clientesById}
+          clientesCargando={clientesCargando}
           onOpen={(p) => setSelectedId(p.id)}
           onChanged={refrescar}
         />
@@ -357,6 +370,7 @@ export function PedidosPage() {
           resumen={resumen}
           savingId={savingEstadoId}
           clientesById={clientesById}
+          clientesCargando={clientesCargando}
           productos={productos ?? []}
           onOpen={(p) => setSelectedId(p.id)}
           onPageChange={cambiarPagina}
