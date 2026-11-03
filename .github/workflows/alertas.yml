@@ -1,0 +1,20 @@
+name: Alertas
+
+on:
+  schedule:
+    # 12:00 UTC = 09:00 en Argentina
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+
+jobs:
+  disparar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar chequeo de alertas
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl --fail-with-body -sS -X POST "$BACKEND_URL/api/alertas/cron" \
+            -H "x-cron-secret: $CRON_SECRET" \
+            --max-time 180 --retry 4 --retry-delay 30 --retry-all-errors

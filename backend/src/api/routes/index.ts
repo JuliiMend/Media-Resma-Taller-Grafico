@@ -16,10 +16,14 @@ import { gastoRouter } from "./gasto.routes";
 import { historialRouter } from "./historial.routes";
 import { alertaRouter } from "./alerta.routes";
 import { reporteRouter } from "./reporte.routes";
+import { cronAlertas } from "../controllers/alerta.controller";
 
 export const apiRouter = Router();
 
 apiRouter.use("/auth", authRouter);
+
+// Disparador externo (GitHub Actions). Se autentica con x-cron-secret, fuera de requireAuth.
+apiRouter.post("/alertas/cron", cronAlertas);
 
 apiRouter.use("/insumos", requireAuth, insumoRouter);
 apiRouter.use("/usuarios", requireAuth, usuarioRouter);

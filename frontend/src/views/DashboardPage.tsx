@@ -10,6 +10,7 @@ import {
   Copy,
   PackageSearch,
   Plus,
+  Send,
   Wallet,
 } from "lucide-react";
 import { api, fetcher, getErrorMessage } from "@/api/client";
@@ -41,6 +42,39 @@ const SWR_DASHBOARD = {
   revalidateOnFocus: true,
   focusThrottleInterval: 60_000,
 } as const;
+
+type ResultadoCanal = {
+  canal: "telegram" | "email";
+  ok: boolean;
+  configurado: boolean;
+  error?: string;
+};
+
+type CanalesResultado = {
+  telegram: ResultadoCanal;
+  email: ResultadoCanal;
+};
+
+type ResultadoAlertas = {
+  avisos: number;
+  canales?: CanalesResultado;
+};
+
+function marcaCanal(canal: ResultadoCanal | undefined): string {
+  if (!canal) return "✗ (sin datos)";
+  if (canal.ok) return "✓";
+  if (!canal.configurado) return "✗ (No configurado)";
+  return `✗${canal.error ? ` (${canal.error})` : ""}`;
+}
+
+function resumenCanales(canales: CanalesResultado | undefined): string {
+  return `Telegram ${marcaCanal(canales?.telegram)} · Email ${marcaCanal(canales?.email)}`;
+}
+
+function fallaronTodosLosCanales(canales: CanalesResultado | undefined): boolean {
+  if (!canales) return false;
+  return !canales.telegram.ok && !canales.email.ok;
+}
 
 const COLORES_ESTADO: Record<string, string> = {
   PENDIENTE: "bg-ink/25",
@@ -826,6 +860,7 @@ export function DashboardPage() {
   } = useSWR<Tarea[]>("/tareas", fetcher, SWR_DASHBOARD);
 
   const [checking, setChecking] = useState(false);
+  const [testing, setTesting] = useState(false);
   const [alertNotice, setAlertNotice] = useState<string | null>(null);
   const [alertError, setAlertError] = useState<string | null>(null);
   const [tareaError, setTareaError] = useState<string | null>(null);
@@ -874,20 +909,43 @@ export function DashboardPage() {
     setAlertNotice(null);
     setAlertError(null);
     try {
-      const { data } = await api.post<{
-        ok: boolean;
-        resultado?: { avisos?: number };
-      }>("/alertas/chequear");
-      const avisos = data.resultado?.avisos ?? 0;
-      setAlertNotice(
-        avisos === 0
-          ? "Todo al día, sin avisos."
-          : `${avisos} ${avisos === 1 ? "aviso enviado" : "avisos enviados"}.`,
-      );
+      const { data } = await api.post<ResultadoAlertas>("/alertas/chequear");
+      if ((data.avisos ?? 0) === 0) {
+        setAlertNotice("Sin avisos pendientes");
+        return;
+      }
+
+      const resumen = resumenCanales(data.canales);
+      if (fallaronTodosLosCanales(data.canales)) {
+        setAlertError(`No se pudieron enviar los avisos: ${resumen}`);
+        return;
+      }
+
+      const cantidad = `${data.avisos} ${data.avisos === 1 ? "aviso" : "avisos"}`;
+      setAlertNotice(`${cantidad} · ${resumen}`);
     } catch (err) {
       setAlertError(getErrorMessage(err));
     } finally {
       setChecking(false);
+    }
+  }
+
+  async function probarNotificaciones() {
+    setTesting(true);
+    setAlertNotice(null);
+    setAlertError(null);
+    try {
+      const { data } = await api.post<{ canales: CanalesResultado }>("/alertas/probar");
+      const resumen = resumenCanales(data.canales);
+      if (fallaronTodosLosCanales(data.canales)) {
+        setAlertError(`No se pudo enviar la prueba: ${resumen}`);
+        return;
+      }
+      setAlertNotice(`Prueba enviada · ${resumen}`);
+    } catch (err) {
+      setAlertError(getErrorMessage(err));
+    } finally {
+      setTesting(false);
     }
   }
 
@@ -971,6 +1029,16 @@ export function DashboardPage() {
             title="Revisar alertas"
           >
             {!checking && <BellRing className="size-4" aria-hidden="true" />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={probarNotificaciones}
+            loading={testing}
+            aria-label="Enviar prueba de notificaciones"
+            title="Enviar prueba"
+          >
+            {!testing && <Send className="size-4" aria-hidden="true" />}
           </Button>
         </div>
       </header>
