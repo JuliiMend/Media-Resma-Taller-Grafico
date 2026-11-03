@@ -80,6 +80,7 @@ export function PedidosPage() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const pedidoParam = params.get("pedido");
+  const nuevoParam = params.get("nuevo");
 
   const { data: selectedPedido, mutate: mutateSelectedPedido } = useSWR<Pedido>(
     selectedId ? `/pedidos/${selectedId}` : null,
@@ -108,6 +109,19 @@ export function PedidosPage() {
       { replace: true },
     );
   }, [pedidoParam, setParams]);
+
+  useEffect(() => {
+    if (nuevoParam !== "1") return;
+    setFormOpen(true);
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("nuevo");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [nuevoParam, setParams]);
 
   useEffect(() => {
     if (!pagina || pagina.total === 0) return;
