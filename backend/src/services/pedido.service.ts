@@ -9,16 +9,11 @@ import {
   formatearMoneda,
   registrarHistorial,
 } from "./historial.helper";
+import { calcularPago, totalTrabajos } from "./pedido.pagos";
 
 type PedidoConDetalles = Prisma.PedidoGetPayload<{
   include: { cliente: true; trabajos: true };
 }>;
-
-const totalTrabajos = (trabajos: { cantidad: unknown; valorUnitario: unknown }[]) =>
-  trabajos.reduce(
-    (acc, t) => acc + Number(t.cantidad) * Number(t.valorUnitario),
-    0
-  );
 
 export function conTotales(pedido: PedidoConDetalles) {
   const totalTrabajosPedido = totalTrabajos(pedido.trabajos);
@@ -240,31 +235,31 @@ export const pedidoService = {
         where: { id },
         include: { trabajos: true },
       });
-      if (!pedido) throw new Error("Pedido no encontrado");
-      if (pedido.estado === "CANCELADO") {
-        throw new HttpError(409, "No se pueden registrar pagos de un pedido cancelado");
-      }
+      if (!pedido) throw new HttpError(404, "Pedido no encontrado");
 
-      const total = totalTrabajos(pedido.trabajos) + Number(pedido.envio ?? 0);
-      const senaActual = Number(pedido.sena ?? 0);
-      const saldoRestante = Math.max(0, total - senaActual);
-      const montoAPagar = monto ?? saldoRestante;
-      const tope = Math.max(total, senaActual);
-      const nuevaSena = Math.min(senaActual + montoAPagar, tope);
+      const pago = calcularPago({
+        estado: pedido.estado,
+        trabajos: pedido.trabajos,
+        envio: pedido.envio,
+        sena: pedido.sena,
+        restaPagar: pedido.restaPagar,
+        monto,
+      });
 
+      // Se actualizan seña y resta juntas: no se depende de recalcularPedido,
+      // que no recalcula pedidos sin trabajos.
       await tx.pedido.update({
         where: { id },
-        data: { sena: nuevaSena },
+        data: { sena: pago.sena, restaPagar: pago.restaPagar },
       });
-      const actualizado = await recalcularPedido(id, tx);
 
       await registrarHistorial(tx, {
         accion: "EDITAR",
         entidad: "pedido",
         entidadId: id,
         detalle:
-          `Registró un pago de ${formatearMoneda(nuevaSena - senaActual)}. ` +
-          `Resta ${formatearMoneda(actualizado.restaPagar)}`,
+          `Registró un pago de ${formatearMoneda(pago.montoAplicado)}. ` +
+          `Resta ${formatearMoneda(pago.restaPagar)}`,
       });
 
       return buscarConDetalles(tx, id);

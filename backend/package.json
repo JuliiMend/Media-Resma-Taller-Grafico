@@ -11,7 +11,10 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "test:reportes": "tsx src/services/reporte.calculos.test.ts"
+    "test:reportes": "tsx src/services/reporte.calculos.test.ts",
+    "test:deudas": "tsx src/services/pedido.pagos.test.ts",
+    "auditar:deudas": "tsx scripts/auditar-deudas.ts",
+    "reproducir:pago-deuda": "tsx scripts/reproducir-pago-deuda.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.20.0",

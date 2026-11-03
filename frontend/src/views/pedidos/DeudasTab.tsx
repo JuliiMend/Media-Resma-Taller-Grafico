@@ -82,7 +82,7 @@ export function DeudasTab({
   const [copiado, setCopiado] = useState<number | null>(null);
 
   const conDeuda = pedidos.filter(
-    (p) => p.estado !== "CANCELADO" && toNumber(p.restaPagar) > 0.005,
+    (p) => p.estado !== "CANCELADO" && toNumber(p.restaPagar) > 0,
   );
   const incluidos = incluirCurso
     ? conDeuda
@@ -147,13 +147,28 @@ export function DeudasTab({
       return;
     }
     const pedidoId = pagoPedido.id;
-    const saldado = valor >= saldo - 0.005;
+    const restaEsperada = Math.max(0, saldo - valor);
     setPagando(true);
     setPagoError(null);
     try {
-      await api.post(`/pedidos/${pedidoId}/pagos`, { monto: valor });
+      const { data: actualizado } = await api.post<Pedido>(
+        `/pedidos/${pedidoId}/pagos`,
+        { monto: valor },
+      );
+      const restaServidor = actualizado?.restaPagar;
+      if (
+        restaServidor === null ||
+        restaServidor === undefined ||
+        Math.abs(toNumber(restaServidor) - restaEsperada) > 0.005
+      ) {
+        // El servidor respondió 200 pero no aplicó el pago: no sacamos el pedido
+        // de la lista y avisamos para que no quede una deuda fantasma.
+        setPagoError("El pago no se aplicó");
+        await onChanged();
+        return;
+      }
       setPagoPedido(null);
-      await onChanged(saldado ? pedidoId : undefined);
+      await onChanged(toNumber(restaServidor) <= 0.005 ? pedidoId : undefined);
     } catch (err) {
       setPagoError(getErrorMessage(err));
     } finally {
@@ -167,7 +182,18 @@ export function DeudasTab({
     setPagando(true);
     setAccionError(null);
     try {
-      await api.post(`/pedidos/${pedidoId}/pagos`);
+      const { data: actualizado } = await api.post<Pedido>(`/pedidos/${pedidoId}/pagos`);
+      const restaServidor = actualizado?.restaPagar;
+      if (
+        restaServidor === null ||
+        restaServidor === undefined ||
+        toNumber(restaServidor) > 0.005
+      ) {
+        setAccionError("El pago no se aplicó");
+        setConfirmarPagado(null);
+        await onChanged();
+        return;
+      }
       setConfirmarPagado(null);
       await onChanged(pedidoId);
     } catch (err) {
