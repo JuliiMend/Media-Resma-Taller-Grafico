@@ -28,9 +28,9 @@ export function ClientesPage() {
         { name: "notas", label: "Notas", type: "textarea" },
       ]}
       columns={[
-        { label: "Nombre", render: (c) => c.nombre, primary: true },
-        { label: "Teléfono", render: (c) => c.telefono || "—" },
-        { label: "Contacto", render: (c) => c.userContacto || "—" },
+        { label: "Nombre", render: (c) => <span className="block max-w-[22rem] truncate" title={c.nombre}>{c.nombre}</span>, primary: true },
+        { label: "Teléfono", render: (c) => <span className="whitespace-nowrap">{c.telefono || "—"}</span> },
+        { label: "Contacto", render: (c) => <span className="block max-w-[16rem] truncate" title={c.userContacto || undefined}>{c.userContacto || "—"}</span> },
         { label: "Notas", render: (c) => <span className="line-clamp-1 text-muted" title={c.notas || undefined}>{c.notas || "—"}</span> },
       ]}
     />
@@ -71,8 +71,8 @@ export function InsumosPage() {
           label: "Nombre",
           primary: true,
           render: (i) => (
-            <span className="flex items-center gap-2">
-              {i.nombre}
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="max-w-[20rem] truncate" title={i.nombre}>{i.nombre}</span>
               {isLowStock(i) && <Badge tone="danger">Stock bajo</Badge>}
             </span>
           ),
@@ -80,7 +80,7 @@ export function InsumosPage() {
         { label: "Stock", align: "right", render: (i) => `${toNumber(i.stockActual)} ${i.unidad}` },
         { label: "Mínimo", align: "right", render: (i) => `${toNumber(i.stockMinimo)} ${i.unidad}` },
         { label: "Precio unit.", align: "right", render: (i) => formatMoney(i.precioUnitario) },
-        { label: "Proveedor", render: (i) => i.proveedor || "—" },
+        { label: "Proveedor", render: (i) => <span className="block max-w-[16rem] truncate" title={i.proveedor || undefined}>{i.proveedor || "—"}</span> },
       ]}
     />
   );
@@ -137,7 +137,7 @@ export function ProductosPage() {
         />
       )}
       columns={[
-        { label: "Nombre", render: (p) => p.nombre, primary: true },
+        { label: "Nombre", render: (p) => <span className="block max-w-[22rem] truncate" title={p.nombre}>{p.nombre}</span>, primary: true },
         { label: "Tipo", render: (p) => <Badge tone={p.tipo === "PROPIO" ? "primary" : "neutral"}>{p.tipo === "PROPIO" ? "Propio" : "Tercerizado"}</Badge> },
         {
           label: "Costo",

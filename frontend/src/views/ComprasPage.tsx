@@ -234,40 +234,48 @@ export function ComprasPage() {
       ) : (
         <>
           <div className="hidden overflow-hidden rounded-xl border border-line bg-surface md:block">
-            <table className="w-full text-sm">
-              <thead className="border-b border-line bg-background/60 text-left text-xs uppercase tracking-wide text-muted">
-                <tr>
-                  <th scope="col" className="px-4 py-3 font-medium">Fecha</th>
-                  <th scope="col" className="px-4 py-3 font-medium">Insumo</th>
-                  <th scope="col" className="px-4 py-3 text-right font-medium">Cantidad</th>
-                  <th scope="col" className="px-4 py-3 text-right font-medium">Precio total</th>
-                  <th scope="col" className="px-4 py-3 text-right font-medium">Precio unit.</th>
-                  <th scope="col" className="px-4 py-3 font-medium">Medio de pago</th>
-                  <th scope="col" className="px-4 py-3"><span className="sr-only">Acciones</span></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {pagina.map((c) => {
-                  const insumo = insumoById.get(c.insumoId);
-                  const cant = toNumber(c.cantidad);
-                  return (
-                    <tr key={c.id} className="hover:bg-ink/5">
-                      <td className="px-4 py-3">{formatDate(c.fecha)}</td>
-                      <td className="px-4 py-3 font-medium">{insumo?.nombre ?? `Insumo #${c.insumoId}`}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">{cant} {insumo?.unidad}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">{formatMoney(c.precio)}</td>
-                      <td className="px-4 py-3 text-right tabular-nums text-muted">{cant > 0 ? formatMoney(toNumber(c.precio) / cant) : "—"}</td>
-                      <td className="px-4 py-3">{c.medioPago || "—"}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-end">
-                          <DeleteButton onClick={() => setToDelete(c)} />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[58rem] text-sm">
+                <thead className="border-b border-line bg-background/60 text-left text-xs uppercase tracking-wide text-muted">
+                  <tr>
+                    <th scope="col" className="px-4 py-3 font-medium">Fecha</th>
+                    <th scope="col" className="px-4 py-3 font-medium">Insumo</th>
+                    <th scope="col" className="px-4 py-3 text-right font-medium">Cantidad</th>
+                    <th scope="col" className="px-4 py-3 text-right font-medium">Precio total</th>
+                    <th scope="col" className="px-4 py-3 text-right font-medium">Precio unit.</th>
+                    <th scope="col" className="px-4 py-3 font-medium">Medio de pago</th>
+                    <th scope="col" className="px-4 py-3"><span className="sr-only">Acciones</span></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  {pagina.map((c) => {
+                    const insumo = insumoById.get(c.insumoId);
+                    const cant = toNumber(c.cantidad);
+                    return (
+                      <tr key={c.id} className="hover:bg-ink/5">
+                        <td className="whitespace-nowrap px-4 py-3">{formatDate(c.fecha)}</td>
+                        <td className="px-4 py-3 font-medium">
+                          <span className="block max-w-[24rem] truncate" title={insumo?.nombre ?? `Insumo #${c.insumoId}`}>
+                            {insumo?.nombre ?? `Insumo #${c.insumoId}`}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{cant} {insumo?.unidad}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatMoney(c.precio)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-muted">{cant > 0 ? formatMoney(toNumber(c.precio) / cant) : "—"}</td>
+                        <td className="px-4 py-3">
+                          <span className="block max-w-[14rem] truncate" title={c.medioPago || undefined}>{c.medioPago || "—"}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex justify-end">
+                            <DeleteButton onClick={() => setToDelete(c)} />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <ul className="flex flex-col gap-3 md:hidden">

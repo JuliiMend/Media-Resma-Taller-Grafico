@@ -376,65 +376,71 @@ export function PedidosTab({
       ) : (
         <>
           <div className="hidden overflow-hidden rounded-xl border border-line bg-surface md:block">
-            <table className="w-full text-sm">
-              <thead className="border-b border-line bg-background/60 text-left text-xs uppercase tracking-wide text-muted">
-                <tr>
-                  <th scope="col" className="px-4 py-3 font-medium">Nº de pedido</th>
-                  <SortableHeader label="Fecha" sortKey="fecha" sort={sortView} onSort={cambiarOrden} />
-                  <th scope="col" className="px-4 py-3 font-medium">Observación</th>
-                  <SortableHeader label="Cliente" sortKey="cliente" sort={sortView} onSort={cambiarOrden} />
-                  <th scope="col" className="px-4 py-3 font-medium">Estado</th>
-                  <SortableHeader label="Total" sortKey="total" sort={sortView} onSort={cambiarOrden} align="right" />
-                  <SortableHeader label="Debe" sortKey="resta" sort={sortView} onSort={cambiarOrden} align="right" />
-                  <SortableHeader label="Entrega" sortKey="entrega" sort={sortView} onSort={cambiarOrden} />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {pedidos.map((p) => {
-                  const estado = estadoInfo(p.estado);
-                  const guardando = savingId === p.id;
-                  return (
-                    <tr
-                      key={p.id}
-                      tabIndex={guardando ? -1 : 0}
-                      aria-busy={guardando}
-                      onClick={() => {
-                        if (!guardando) onOpen(p);
-                      }}
-                      onKeyDown={guardando ? undefined : openOnKey(p)}
-                      className={cn(
-                        "cursor-pointer hover:bg-ink/5 focus-visible:bg-ink/5 focus-visible:outline-none",
-                        guardando && "pointer-events-none opacity-60",
-                      )}
-                    >
-                      <td className="px-4 py-3">
-                        <span className="text-base font-bold tabular-nums">#{p.id}</span>
-                      </td>
-                      <td className="px-4 py-3 text-muted">{formatDate(p.fecha)}</td>
-                      <td className="px-4 py-3">
-                        <span
-                          className="line-clamp-2 max-w-[18rem] text-sm text-muted"
-                          title={p.observaciones?.trim() || undefined}
-                        >
-                          {p.observaciones?.trim() || "—"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">{clienteCell(p)}</td>
-                      <td className="px-4 py-3">
-                        <Badge tone={estado.tone}>{estado.label}</Badge>
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums">
-                        {formatMoney(toNumber(p.sena) + toNumber(p.restaPagar))}
-                      </td>
-                      <td className="px-4 py-3 text-right">{debeCell(p)}</td>
-                      <td className="px-4 py-3 text-muted">
-                        {p.fechaEntrega ? formatDate(p.fechaEntrega) : "—"}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[60rem] text-sm">
+                <thead className="border-b border-line bg-background/60 text-left text-xs uppercase tracking-wide text-muted">
+                  <tr>
+                    <th scope="col" className="whitespace-nowrap px-4 py-3 font-medium">Nº de pedido</th>
+                    <SortableHeader label="Fecha" sortKey="fecha" sort={sortView} onSort={cambiarOrden} />
+                    <th scope="col" className="min-w-[15rem] px-4 py-3 font-medium">Observación</th>
+                    <SortableHeader label="Cliente" sortKey="cliente" sort={sortView} onSort={cambiarOrden} />
+                    <th scope="col" className="px-4 py-3 font-medium">Estado</th>
+                    <SortableHeader label="Total" sortKey="total" sort={sortView} onSort={cambiarOrden} align="right" />
+                    <SortableHeader label="Debe" sortKey="resta" sort={sortView} onSort={cambiarOrden} align="right" />
+                    <SortableHeader label="Entrega" sortKey="entrega" sort={sortView} onSort={cambiarOrden} />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  {pedidos.map((p) => {
+                    const estado = estadoInfo(p.estado);
+                    const guardando = savingId === p.id;
+                    return (
+                      <tr
+                        key={p.id}
+                        tabIndex={guardando ? -1 : 0}
+                        aria-busy={guardando}
+                        onClick={() => {
+                          if (!guardando) onOpen(p);
+                        }}
+                        onKeyDown={guardando ? undefined : openOnKey(p)}
+                        className={cn(
+                          "cursor-pointer hover:bg-ink/5 focus-visible:bg-ink/5 focus-visible:outline-none",
+                          guardando && "pointer-events-none opacity-60",
+                        )}
+                      >
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <span className="text-base font-bold tabular-nums">#{p.id}</span>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-muted">{formatDate(p.fecha)}</td>
+                        <td className="min-w-[15rem] px-4 py-3">
+                          <span
+                            className="line-clamp-2 max-w-[18rem] text-sm text-muted"
+                            title={p.observaciones?.trim() || undefined}
+                          >
+                            {p.observaciones?.trim() || "—"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="block max-w-[16rem] truncate" title={nombreCliente(p, clientesById)}>
+                            {clienteCell(p)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge tone={estado.tone}>{estado.label}</Badge>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">
+                          {formatMoney(toNumber(p.sena) + toNumber(p.restaPagar))}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right">{debeCell(p)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-muted">
+                          {p.fechaEntrega ? formatDate(p.fechaEntrega) : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <ul className="flex flex-col gap-3 md:hidden">

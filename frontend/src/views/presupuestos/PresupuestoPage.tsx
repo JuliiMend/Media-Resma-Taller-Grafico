@@ -17,6 +17,7 @@ import {
 import { api, fetcher, getErrorMessage } from "@/api/client";
 import { useAuth } from "@/auth/AuthContext";
 import { Button, Card, ConfirmDialog, ErrorBanner, Field, Input, Modal, PageHeader, Select, Textarea } from "@/components/ui";
+import { PageContainer } from "@/components/PageContainer";
 import { PrecioConRecargo } from "@/components/PrecioConRecargo";
 import { SearchSelect } from "@/components/SearchSelect";
 import { ClienteQuickModal, ProductoQuickModal } from "@/components/QuickCreate";
@@ -505,7 +506,7 @@ export function PresupuestoPage() {
     totales.lineasBajoCosto > 0 || totales.totalBajoCosto;
 
   return (
-    <div className="flex flex-col gap-6">
+    <PageContainer size="narrow" className="flex flex-col gap-6">
       <PageHeader
         title="Presupuestos"
         description="Armá un presupuesto, descargalo como PDF o mandalo por WhatsApp. El presupuesto no se guarda en el sistema."
@@ -1009,6 +1010,6 @@ export function PresupuestoPage() {
       />
 
       <ProductoQuickModal open={productoModal} onClose={() => setProductoModal(false)} onCreated={productoCreado} />
-    </div>
+    </PageContainer>
   );
 }

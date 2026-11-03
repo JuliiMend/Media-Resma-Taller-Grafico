@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   ChartColumn,
   ClipboardList,
@@ -64,7 +64,6 @@ export function Layout() {
   const { logout } = useAuth();
   const { profile } = useProfile();
   const navigate = useNavigate();
-  const { pathname } = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   function handleLogout() {
@@ -129,14 +128,7 @@ export function Layout() {
         </div>
       )}
 
-      <main
-        className={cn(
-          "mx-auto w-full flex-1",
-          pathname === "/dashboard"
-            ? "max-w-none px-0 py-0"
-            : "max-w-7xl px-4 py-6 md:px-8 md:py-10",
-        )}
-      >
+      <main className="mx-auto w-full min-w-0 max-w-[1600px] flex-1 px-4 py-6 md:px-6 md:py-8 xl:px-8">
         <Outlet />
       </main>
     </div>

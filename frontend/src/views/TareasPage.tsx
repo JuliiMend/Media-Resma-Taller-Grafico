@@ -144,8 +144,8 @@ export function TareasPage() {
                 aria-label={done ? `Marcar "${t.titulo}" como pendiente` : `Marcar "${t.titulo}" como completada`}
               />
               <div className="min-w-0 flex-1">
-                <p className={cn("font-medium", done && "text-muted line-through")}>{t.titulo}</p>
-                {t.descripcion && <p className="mt-0.5 text-sm text-muted text-pretty">{t.descripcion}</p>}
+                <p className={cn("truncate font-medium", done && "text-muted line-through")} title={t.titulo}>{t.titulo}</p>
+                {t.descripcion && <p className="mt-0.5 max-w-prose text-sm text-muted text-pretty">{t.descripcion}</p>}
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {t.pedidoId && <Badge tone="primary">Pedido #{t.pedidoId}</Badge>}
                   {t.fechaLimite && (
