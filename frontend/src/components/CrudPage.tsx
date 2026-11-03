@@ -320,34 +320,36 @@ export function CrudPage<T extends { id: number; activo?: boolean }>({
       ) : (
         <>
           <div className="hidden overflow-hidden rounded-xl border border-line bg-surface md:block">
-            <table className="w-full text-sm">
-              <thead className="border-b border-line bg-background/60 text-left text-xs uppercase tracking-wide text-muted">
-                <tr>
-                  {columns.map((c) => (
-                    <th key={c.label} scope="col" className={cn("px-4 py-3 font-medium", c.align === "right" && "text-right")}>
-                      {c.label}
-                    </th>
-                  ))}
-                  <th scope="col" className="px-4 py-3">
-                    <span className="sr-only">Acciones</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {filas.map((item) => (
-                  <tr key={item.id} className={cn("hover:bg-ink/5", rowHighlight?.(item) && "bg-danger-soft/60")}>
+            <div className="overflow-x-auto">
+              <table className={cn("w-full text-sm", columns.length > 5 && "min-w-[56rem]")}>
+                <thead className="border-b border-line bg-background/60 text-left text-xs uppercase tracking-wide text-muted">
+                  <tr>
                     {columns.map((c) => (
-                      <td key={c.label} className={cn("px-4 py-3", c.align === "right" && "text-right tabular-nums")}>
-                        {c.render(item)}
-                      </td>
+                      <th key={c.label} scope="col" className={cn("px-4 py-3 font-medium", c.align === "right" && "text-right")}>
+                        {c.label}
+                      </th>
                     ))}
-                    <td className="px-4 py-3">
-                      <RowActions onEdit={() => openForm(item)} onDelete={() => setToDelete(item)} />
-                    </td>
+                    <th scope="col" className="px-4 py-3">
+                      <span className="sr-only">Acciones</span>
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  {filas.map((item) => (
+                    <tr key={item.id} className={cn("hover:bg-ink/5", rowHighlight?.(item) && "bg-danger-soft/60")}>
+                      {columns.map((c) => (
+                        <td key={c.label} className={cn("px-4 py-3", c.align === "right" && "whitespace-nowrap text-right tabular-nums")}>
+                          {c.render(item)}
+                        </td>
+                      ))}
+                      <td className="px-4 py-3">
+                        <RowActions onEdit={() => openForm(item)} onDelete={() => setToDelete(item)} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <ul className="flex flex-col gap-3 md:hidden">

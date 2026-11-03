@@ -4,6 +4,7 @@ import { api, getErrorMessage } from "@/api/client";
 import { useAuth } from "@/auth/AuthContext";
 import { useProfile } from "@/auth/useProfile";
 import { Avatar } from "@/components/Avatar";
+import { PageContainer } from "@/components/PageContainer";
 import { Badge, Button, ErrorBanner, Field, Input, LoadingState, PageHeader } from "@/components/ui";
 import { MAX_PHOTO_BYTES, resizeImage } from "@/lib/profile-photo";
 import type { Usuario } from "@/types";
@@ -78,7 +79,7 @@ export function PerfilPage() {
   }
 
   return (
-    <div>
+    <PageContainer size="narrow">
       <PageHeader title="Mi perfil" description="Actualizá tus datos, foto y contraseña." />
       {notice && <div role="status" className="mb-4 rounded-xl border border-success/20 bg-success-soft px-4 py-3 text-sm text-success">{notice}</div>}
       <form onSubmit={handleSave} className="grid gap-6 lg:grid-cols-[300px_1fr]">
@@ -96,6 +97,6 @@ export function PerfilPage() {
           <div className="flex justify-end"><Button type="submit" loading={saving}>Guardar cambios</Button></div>
         </div>
       </form>
-    </div>
+    </PageContainer>
   );
 }

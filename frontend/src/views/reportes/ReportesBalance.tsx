@@ -36,7 +36,7 @@ function ListaCompras({ compras }: { compras: Compra[] }) {
   return (
     <>
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[36rem] text-sm">
           <thead className="border-b border-line text-left text-xs uppercase tracking-wide text-muted">
             <tr>
               <th scope="col" className="px-3 py-2 font-medium">Fecha</th>
@@ -89,7 +89,7 @@ function ListaGastos({ gastos }: { gastos: Gasto[] }) {
   return (
     <>
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[32rem] text-sm">
           <thead className="border-b border-line text-left text-xs uppercase tracking-wide text-muted">
             <tr>
               <th scope="col" className="px-3 py-2 font-medium">Fecha</th>
@@ -315,7 +315,7 @@ export function ReportesBalance({ periodo }: { periodo: PeriodoResuelto }) {
               <p className="px-4 py-4 text-sm text-muted">No hay gastos registrados en el período.</p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[30rem] text-sm">
                   <thead className="border-b border-line text-left text-xs uppercase tracking-wide text-muted">
                     <tr>
                       <SortableHeader

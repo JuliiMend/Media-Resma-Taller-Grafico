@@ -142,37 +142,45 @@ export function HistorialPage() {
       ) : (
         <>
           <div className="hidden overflow-hidden rounded-xl border border-line bg-surface md:block">
-            <table className="w-full text-sm">
-              <thead className="border-b border-line bg-background/60 text-left text-xs uppercase tracking-wide text-muted">
-                <tr>
-                  <th scope="col" className="px-4 py-3 font-medium">Fecha</th>
-                  <th scope="col" className="px-4 py-3 font-medium">Usuario</th>
-                  <th scope="col" className="px-4 py-3 font-medium">Acción</th>
-                  <th scope="col" className="px-4 py-3 font-medium">Entidad</th>
-                  <th scope="col" className="px-4 py-3 font-medium">Detalle</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {shown.map((e) => (
-                  <tr key={e.id} className="align-top hover:bg-ink/5">
-                    <td className="whitespace-nowrap px-4 py-3 text-muted tabular-nums">{formatDateTime(e.fecha)}</td>
-                    <td className="px-4 py-3">{e.usuario?.nombre ?? `Usuario #${e.usuarioId}`}</td>
-                    <td className="px-4 py-3"><Badge tone={accionTone(e.accion)}>{label(e.accion)}</Badge></td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      {label(e.entidad)}{" "}
-                      {e.entidad === "pedido" ? (
-                        <Link to={`/pedidos?pedido=${e.entidadId}`} className="font-medium text-primary underline-offset-2 hover:underline">
-                          #{e.entidadId}
-                        </Link>
-                      ) : (
-                        <span className="text-muted">#{e.entidadId}</span>
-                      )}
-                    </td>
-                    <td className="whitespace-pre-line px-4 py-3 text-pretty"><Detalle value={e.detalle} /></td>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[60rem] text-sm">
+                <thead className="border-b border-line bg-background/60 text-left text-xs uppercase tracking-wide text-muted">
+                  <tr>
+                    <th scope="col" className="px-4 py-3 font-medium">Fecha</th>
+                    <th scope="col" className="px-4 py-3 font-medium">Usuario</th>
+                    <th scope="col" className="px-4 py-3 font-medium">Acción</th>
+                    <th scope="col" className="px-4 py-3 font-medium">Entidad</th>
+                    <th scope="col" className="px-4 py-3 font-medium">Detalle</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  {shown.map((e) => (
+                    <tr key={e.id} className="align-top hover:bg-ink/5">
+                      <td className="whitespace-nowrap px-4 py-3 text-muted tabular-nums">{formatDateTime(e.fecha)}</td>
+                      <td className="px-4 py-3">
+                        <span className="block max-w-[14rem] truncate" title={e.usuario?.nombre ?? `Usuario #${e.usuarioId}`}>
+                          {e.usuario?.nombre ?? `Usuario #${e.usuarioId}`}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3"><Badge tone={accionTone(e.accion)}>{label(e.accion)}</Badge></td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        {label(e.entidad)}{" "}
+                        {e.entidad === "pedido" ? (
+                          <Link to={`/pedidos?pedido=${e.entidadId}`} className="font-medium text-primary underline-offset-2 hover:underline">
+                            #{e.entidadId}
+                          </Link>
+                        ) : (
+                          <span className="text-muted">#{e.entidadId}</span>
+                        )}
+                      </td>
+                      <td className="whitespace-pre-line px-4 py-3 text-pretty">
+                        <div className="max-w-[52rem]"><Detalle value={e.detalle} /></div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <ul className="flex flex-col gap-3 md:hidden">

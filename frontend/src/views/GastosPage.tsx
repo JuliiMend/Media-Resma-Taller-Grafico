@@ -122,7 +122,7 @@ export function GastosPage() {
         },
       ]}
       columns={[
-        { label: "Concepto", render: (g) => g.concepto, primary: true },
+        { label: "Concepto", render: (g) => <span className="block max-w-[24rem] truncate" title={g.concepto}>{g.concepto}</span>, primary: true },
         { label: "Fecha", render: (g) => formatDate(g.fecha) },
         { label: "Medio de pago", render: (g) => g.medioPago || "—" },
         { label: "Monto", align: "right", render: (g) => formatMoney(g.monto) },

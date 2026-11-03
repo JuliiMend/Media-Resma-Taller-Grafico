@@ -372,87 +372,89 @@ export function DeudasTab({
           </div>
 
           <div className="hidden overflow-hidden rounded-xl border border-line bg-surface md:block">
-            <table className="w-full text-sm">
-              <thead className="border-b border-line bg-background/60 text-left text-xs uppercase tracking-wide text-muted">
-                <tr>
-                  <SortableHeader label="Cliente" sortKey="cliente" sort={sortView} onSort={setSort} />
-                  <SortableHeader label="Pedidos" sortKey="cantidad" sort={sortView} onSort={setSort} />
-                  <SortableHeader label="Total adeudado" sortKey="total" sort={sortView} onSort={setSort} align="right" />
-                  <SortableHeader label="Antigüedad" sortKey="dias" sort={sortView} onSort={setSort} align="right" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {grupos.map((g) => {
-                  const cliente = clienteDe(g.pedidos[0], clientesById);
-                  const nombre = nombreCliente(g.pedidos[0], clientesById);
-                  const pendiente = clientePendiente(g.pedidos[0], clientesById, clientesCargando);
-                  const open = abierto.has(g.clienteId);
-                  return (
-                    <Fragment key={g.clienteId}>
-                      <tr
-                        className="cursor-pointer hover:bg-ink/5"
-                        onClick={() => toggleGrupo(g.clienteId)}
-                      >
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              aria-expanded={open}
-                              aria-label={open ? `Ocultar pedidos de ${nombre}` : `Ver pedidos de ${nombre}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleGrupo(g.clienteId);
-                              }}
-                              className="rounded p-0.5 text-muted hover:bg-raised"
-                            >
-                              {open ? (
-                                <ChevronDown className="size-4" aria-hidden="true" />
-                              ) : (
-                                <ChevronRight className="size-4" aria-hidden="true" />
-                              )}
-                            </button>
-                            <div className="min-w-0">
-                              {pendiente ? (
-                                <span
-                                  role="status"
-                                  aria-label="Cargando cliente"
-                                  className="inline-block h-4 w-28 animate-pulse rounded bg-raised"
-                                />
-                              ) : (
-                                <p className="font-medium">{nombre}</p>
-                              )}
-                              {cliente?.telefono && <p className="text-xs text-muted">{cliente.telefono}</p>}
-                              {cliente?.notas && (
-                                <p
-                                  className="line-clamp-2 max-w-xs text-xs text-warning"
-                                  title={cliente.notas}
-                                >
-                                  {cliente.notas}
-                                </p>
-                              )}
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[48rem] text-sm">
+                <thead className="border-b border-line bg-background/60 text-left text-xs uppercase tracking-wide text-muted">
+                  <tr>
+                    <SortableHeader label="Cliente" sortKey="cliente" sort={sortView} onSort={setSort} />
+                    <SortableHeader label="Pedidos" sortKey="cantidad" sort={sortView} onSort={setSort} />
+                    <SortableHeader label="Total adeudado" sortKey="total" sort={sortView} onSort={setSort} align="right" />
+                    <SortableHeader label="Antigüedad" sortKey="dias" sort={sortView} onSort={setSort} align="right" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  {grupos.map((g) => {
+                    const cliente = clienteDe(g.pedidos[0], clientesById);
+                    const nombre = nombreCliente(g.pedidos[0], clientesById);
+                    const pendiente = clientePendiente(g.pedidos[0], clientesById, clientesCargando);
+                    const open = abierto.has(g.clienteId);
+                    return (
+                      <Fragment key={g.clienteId}>
+                        <tr
+                          className="cursor-pointer hover:bg-ink/5"
+                          onClick={() => toggleGrupo(g.clienteId)}
+                        >
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                aria-expanded={open}
+                                aria-label={open ? `Ocultar pedidos de ${nombre}` : `Ver pedidos de ${nombre}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleGrupo(g.clienteId);
+                                }}
+                                className="rounded p-0.5 text-muted hover:bg-raised"
+                              >
+                                {open ? (
+                                  <ChevronDown className="size-4" aria-hidden="true" />
+                                ) : (
+                                  <ChevronRight className="size-4" aria-hidden="true" />
+                                )}
+                              </button>
+                              <div className="min-w-0 max-w-[20rem]">
+                                {pendiente ? (
+                                  <span
+                                    role="status"
+                                    aria-label="Cargando cliente"
+                                    className="inline-block h-4 w-28 animate-pulse rounded bg-raised"
+                                  />
+                                ) : (
+                                  <p className="truncate font-medium" title={nombre}>{nombre}</p>
+                                )}
+                                {cliente?.telefono && <p className="truncate text-xs text-muted">{cliente.telefono}</p>}
+                                {cliente?.notas && (
+                                  <p
+                                    className="line-clamp-2 max-w-xs text-xs text-warning"
+                                    title={cliente.notas}
+                                  >
+                                    {cliente.notas}
+                                  </p>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 tabular-nums">
-                          {g.pedidos.length} {g.pedidos.length === 1 ? "pedido" : "pedidos"}
-                        </td>
-                        <td className="px-4 py-3 text-right font-semibold text-danger tabular-nums">{formatMoney(g.total)}</td>
-                        <td className={cn("px-4 py-3 text-right tabular-nums", g.dias > 30 ? "font-medium text-danger" : "text-muted")}>
-                          {g.dias} días
-                        </td>
-                      </tr>
-                      {open && (
-                        <tr className="border-b border-line bg-background/40">
-                          <td colSpan={4} className="px-4 py-3">
-                            <DetalleGrupo g={g} />
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 tabular-nums">
+                            {g.pedidos.length} {g.pedidos.length === 1 ? "pedido" : "pedidos"}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-danger tabular-nums">{formatMoney(g.total)}</td>
+                          <td className={cn("whitespace-nowrap px-4 py-3 text-right tabular-nums", g.dias > 30 ? "font-medium text-danger" : "text-muted")}>
+                            {g.dias} días
                           </td>
                         </tr>
-                      )}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
+                        {open && (
+                          <tr className="border-b border-line bg-background/40">
+                            <td colSpan={4} className="px-4 py-3">
+                              <DetalleGrupo g={g} />
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <ul className="flex flex-col gap-3 md:hidden">
@@ -477,9 +479,9 @@ export function DeudasTab({
                           className="inline-block h-4 w-28 animate-pulse rounded bg-raised"
                         />
                       ) : (
-                        <p className="font-medium">{nombre}</p>
+                        <p className="truncate font-medium" title={nombre}>{nombre}</p>
                       )}
-                      <p className="text-xs text-muted">
+                      <p className="truncate text-xs text-muted">
                         {cliente?.telefono ? `${cliente.telefono} · ` : ""}
                         {g.pedidos.length} {g.pedidos.length === 1 ? "pedido" : "pedidos"} · {g.dias} días
                       </p>

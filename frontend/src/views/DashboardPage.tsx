@@ -986,7 +986,7 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1600px] px-4 py-6 md:px-6 md:py-8">
+    <div className="w-full">
       <header className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="min-w-0">
           <p className="text-sm font-medium text-muted">{fechaHoyLarga()}</p>
