@@ -121,6 +121,8 @@ export const pedidoService = {
 
   listarConSaldo: () => pedidoRepository.findConSaldo(),
 
+  listarActivosConEntrega: () => pedidoRepository.findActivosConEntrega(),
+
   crear: async (data: CrearPedidoInput) => {
     const { trabajos = [], ...pedidoData } = data;
 

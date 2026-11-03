@@ -22,8 +22,13 @@ export const env = {
 
   emailUser: process.env.EMAIL_USER ?? "",
   emailPass: process.env.EMAIL_PASS ?? "",
+  emailRemitente: process.env.EMAIL_REMITENTE ?? "",
   emailDestinos: (process.env.EMAIL_DESTINOS ?? "")
       .split(",")
       .map((mail) => mail.trim())
       .filter(Boolean),
+  brevoApiKey: process.env.BREVO_API_KEY ?? "",
+
+  cronSecret: process.env.CRON_SECRET ?? "",
+  enableInternalCron: process.env.ENABLE_INTERNAL_CRON === "true",
 };

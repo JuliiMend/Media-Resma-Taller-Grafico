@@ -1,82 +1,94 @@
 import { insumoService } from "./insumo.service";
 import { pedidoService } from "./pedido.service";
 import { tareaService } from "./tarea.service";
-import { enviarMensajeTelegram } from "../utils/telegram";
-import { enviarEmail } from "../utils/email";
+import { enviarMensajeTelegram, estadoTelegram } from "../utils/telegram";
+import { enviarEmail, estadoEmail } from "../utils/email";
+import {
+  clasificarPedidos,
+  construirResumen,
+  hoyBA,
+  sumarDiasISO,
+  type CanalesResultado,
+} from "../utils/notificaciones";
+
+const TEXTO_PRUEBA = "✅ Prueba de notificaciones — Media Resma";
+const HTML_PRUEBA = [
+  "<!doctype html>",
+  '<html lang="es"><body style="margin:0;padding:24px;background:#f6f4ef;font-family:Arial,Helvetica,sans-serif;color:#2c2925">',
+  '<div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e4ded3;border-radius:12px;padding:24px">',
+  '<h2 style="margin:0 0 8px;font-size:18px">✅ Prueba de notificaciones</h2>',
+  '<p style="margin:0;font-size:14px">Media Resma Taller Gráfico</p>',
+  "</div></body></html>",
+].join("");
+
+function canalesSinEnvio(): CanalesResultado {
+  return { telegram: estadoTelegram(), email: estadoEmail() };
+}
 
 export const alertaService = {
   chequear: async () => {
-    const hoy = new Date();
-    const hasta = new Date();
-    hasta.setDate(hasta.getDate() + 3);
+    const hoy = hoyBA();
+    const hasta = new Date(`${sumarDiasISO(hoy, 3)}T23:59:59.999Z`);
 
-    const [insumosStockBajo, tareasPendientes, pedidosConSaldo, pedidosProximos] = await Promise.all([
-      insumoService.listarConStockBajo(),
-      tareaService.listarParaAlertas(new Date(0), hasta),
-      pedidoService.listarConSaldo(),
-      pedidoService.listarProximosAEntregar(hoy, hasta),
-    ]);
+    const [insumosStockBajo, tareasPendientes, pedidosConSaldo, pedidosActivos] =
+      await Promise.all([
+        insumoService.listarConStockBajo(),
+        tareaService.listarParaAlertas(new Date(0), hasta),
+        pedidoService.listarConSaldo(),
+        pedidoService.listarActivosConEntrega(),
+      ]);
 
-    const avisos = insumosStockBajo.length + tareasPendientes.length + pedidosConSaldo.length + pedidosProximos.length;
+    const { atrasados, proximos } = clasificarPedidos(pedidosActivos, hoy);
+    const resumen = construirResumen({
+      atrasados,
+      proximos,
+      deudas: pedidosConSaldo,
+      stockBajo: insumosStockBajo,
+      tareas: tareasPendientes,
+      hoy,
+    });
 
-    if (avisos === 0) {
-      return { avisos: 0 };
+    const base = {
+      avisos: resumen.avisos,
+      pedidosAtrasados: resumen.conteos.pedidosAtrasados,
+      pedidosProximos: resumen.conteos.pedidosProximos,
+      pedidosConSaldo: resumen.conteos.pedidosConSaldo,
+      stockBajo: resumen.conteos.stockBajo,
+      tareasPendientes: resumen.conteos.tareasPendientes,
+      deudasAgrupadas: resumen.deudasAgrupadas,
+      deudasRestantes: resumen.deudasRestantes,
+    };
+
+    // Sin avisos no se molesta a nadie: se devuelve el estado de los canales.
+    if (resumen.avisos === 0) {
+      return { ...base, canales: canalesSinEnvio() };
     }
 
-    const secciones: string[] = [];
-
-    if (insumosStockBajo.length > 0) {
-      secciones.push(
-          ["<b>⚠ Stock bajo</b>", ...insumosStockBajo.map(
-              (i) => `• ${i.nombre}: quedan ${i.stockActual} ${i.unidad} (mínimo ${i.stockMinimo})`
-          )].join("\n")
-      );
-    }
-
-    if (tareasPendientes.length > 0) {
-      secciones.push(
-          ["<b>⚠ Tareas pendientes</b>", ...tareasPendientes.map((t) => {
-            const vencida = t.fechaLimite && t.fechaLimite < hoy ? "🚨 ¡VENCIDA! " : "";
-            const fechaStr = t.fechaLimite?.toLocaleDateString("es-AR") ?? "sin fecha";
-            return `• ${vencida}${t.titulo}: ${fechaStr}`;
-          })].join("\n")
-      );
-    }
-
-    if (pedidosProximos.length > 0) {
-      secciones.push(
-          ["<b>⚠ Pedidos a entregar pronto</b>", ...pedidosProximos.map((p) => {
-            const vencido = p.fechaEntrega && p.fechaEntrega < hoy ? "🚨 ¡ATRASADO! " : "";
-            const fechaStr = p.fechaEntrega?.toLocaleDateString("es-AR") ?? "sin fecha";
-            return `• ${vencido}Pedido #${p.id} (${p.cliente.nombre}): Entregar el ${fechaStr}`;
-          })].join("\n")
-      );
-    }
-
-    if (pedidosConSaldo.length > 0) {
-      secciones.push(
-          ["<b>⚠ Pedidos con saldo</b>", ...pedidosConSaldo.map(
-              (p) => `• Pedido #${p.id} (${p.cliente.nombre}): resta $${p.restaPagar}`
-          )].join("\n")
-      );
-    }
-
-    const mensajeTelegram = secciones.join("\n\n");
-    const mensajeEmail = `
-      ${secciones.map((seccion) => `<p>${seccion.replace(/\n/g, "<br>")}</p>`).join("")}
-    `;
-
-    await Promise.all([
-      enviarMensajeTelegram(mensajeTelegram),
-      enviarEmail("Aviso de alertas - Media Resma", mensajeEmail),
+    const [telegram, email] = await Promise.all([
+      enviarMensajeTelegram(resumen.texto),
+      enviarEmail(resumen.asunto, resumen.html),
     ]);
 
     return {
-      avisos,
-      stockBajo: insumosStockBajo.length,
-      tareasPendientes: tareasPendientes.length,
-      pedidosProximos: pedidosProximos.length,
-      pedidosConSaldo: pedidosConSaldo.length,
+      ...base,
+      canales: {
+        telegram,
+        email,
+      } satisfies CanalesResultado,
+    };
+  },
+
+  probar: async () => {
+    const [telegram, email] = await Promise.all([
+      enviarMensajeTelegram(TEXTO_PRUEBA),
+      enviarEmail("Prueba de notificaciones — Media Resma", HTML_PRUEBA),
+    ]);
+
+    return {
+      canales: {
+        telegram,
+        email,
+      } satisfies CanalesResultado,
     };
   },
 };
