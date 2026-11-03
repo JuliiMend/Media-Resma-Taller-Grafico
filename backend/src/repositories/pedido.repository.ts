@@ -154,6 +154,17 @@ export const pedidoRepository = {
       include: { cliente: true },
     }),
 
+  /** Pedidos activos con entrega agendada, para separar atrasados y próximos en la zona horaria local. */
+  findActivosConEntrega: () =>
+    prisma.pedido.findMany({
+      where: {
+        fechaEntrega: { not: null },
+        estado: { notIn: ["ENTREGADO", "CANCELADO"] },
+      },
+      include: { cliente: true },
+      orderBy: { fechaEntrega: "asc" },
+    }),
+
   resumen: async (): Promise<PedidoResumen> => {
     const [fila] = await prisma.$queryRaw<
       { activos: number; saldoPendiente: number; conDeuda: number }[]

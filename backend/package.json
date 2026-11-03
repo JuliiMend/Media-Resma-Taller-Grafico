@@ -13,6 +13,7 @@
     "prisma:studio": "prisma studio",
     "test:reportes": "tsx src/services/reporte.calculos.test.ts",
     "test:deudas": "tsx src/services/pedido.pagos.test.ts",
+    "test:alertas": "tsx src/services/alerta.notificaciones.test.ts",
     "auditar:deudas": "tsx scripts/auditar-deudas.ts",
     "corregir:residuos": "tsx scripts/corregir-residuos-deuda.ts",
     "reproducir:pago-deuda": "tsx scripts/reproducir-pago-deuda.ts"
