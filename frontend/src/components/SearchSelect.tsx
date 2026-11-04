@@ -6,6 +6,10 @@ import { Input } from "@/components/ui";
 export interface SearchSelectOption {
   value: string;
   label: string;
+  /** Texto secundario visible en la lista (ej. "entrega 22/10"). */
+  secondary?: string;
+  /** Texto extra para la búsqueda cuando la etiqueta no muestra toda la información. */
+  searchText?: string;
 }
 
 function normalize(text: string): string {
@@ -52,7 +56,9 @@ export function SearchSelect({
   const displayValue = open ? query : selectedLabel || emptyLabel || "";
 
   const needle = normalize(query.trim());
-  const filtered = needle ? options.filter((o) => normalize(o.label).includes(needle)) : options;
+  const filtered = needle
+    ? options.filter((o) => normalize(`${o.label} ${o.secondary ?? ""} ${o.searchText ?? ""}`).includes(needle))
+    : options;
   const showCreate = Boolean(createLabel && onCreate);
   // La opción de crear va primera; las opciones reales arrancan después.
   const firstOptionIndex = showCreate ? 1 : 0;
@@ -244,7 +250,10 @@ export function SearchSelect({
                     option.value === value && "font-semibold text-primary",
                   )}
                 >
-                  {option.label}
+                  <span className="block">{option.label}</span>
+                  {option.secondary && (
+                    <span className="mt-0.5 block text-xs font-normal text-muted">{option.secondary}</span>
+                  )}
                 </li>
               );
             })}

@@ -99,7 +99,10 @@ export const pedidoRepository = {
     prisma.pedido.findMany({
       where: buildWhere(filtros),
       orderBy: buildOrderBy(filtros),
-      include: { cliente: true, trabajos: true },
+      include: {
+        cliente: true,
+        trabajos: { include: { producto: { select: { nombre: true } } } },
+      },
     }),
 
   findAllPaginated: async (page: number, pageSize: number, filtros: PedidoFiltros = {}) => {

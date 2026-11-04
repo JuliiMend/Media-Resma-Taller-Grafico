@@ -10,11 +10,29 @@ export function precioDesdeCosto(costo: number, porcentaje: number): number {
 
 /**
  * Recargo porcentual sobre el costo: (precio - costo) / costo × 100.
- * Devuelve null cuando no hay un costo válido (> 0).
+ * Devuelve null cuando falta un costo o un precio válido (> 0): un precio
+ * vacío o en 0 todavía no está cargado y no debe mostrar -100%.
  */
 export function recargoDesdePrecio(costo: number, precio: number): number | null {
-  if (!Number.isFinite(costo) || !Number.isFinite(precio) || costo <= 0) return null;
+  if (!Number.isFinite(costo) || !Number.isFinite(precio) || costo <= 0 || precio <= 0) return null;
   return ((precio - costo) / costo) * 100;
+}
+
+/**
+ * Precio que corresponde al cambiar el costo.
+ * Si todavía no hay precio cargado (> 0), se calcula desde el costo con el
+ * recargo actual (0% por defecto). Si el usuario ya cargó un precio, se
+ * conserva y el recargo se recalcula por separado.
+ */
+export function precioAlCambiarCosto(
+  costo: number,
+  precioActual: number | null,
+  porcentajeActual: number | null = null,
+): number {
+  if (precioActual !== null && Number.isFinite(precioActual) && precioActual > 0) {
+    return redondearDinero(precioActual);
+  }
+  return precioDesdeCosto(costo, porcentajeActual ?? 0);
 }
 
 /**
