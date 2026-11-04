@@ -1,9 +1,16 @@
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import useSWR from "swr";
 import { CalendarClock, Plus, Trash2 } from "lucide-react";
 import { api, fetcher, getErrorMessage } from "@/api/client";
 import { useAuth } from "@/auth/AuthContext";
-import { cn, formatDate } from "@/lib/format";
+import { cn, formatDate, toNumber } from "@/lib/format";
+import {
+  detallePedido,
+  etiquetaPedido,
+  nombreClientePedido,
+  textoBusquedaPedido,
+  textoEntregaPedido,
+} from "@/lib/pedido";
 import { useRegistrarHistorial } from "@/lib/useHistorial";
 import {
   Badge,
@@ -16,13 +23,25 @@ import {
   LoadingState,
   Modal,
   PageHeader,
-  Select,
   Textarea,
 } from "@/components/ui";
 import { Pagination, paginate } from "@/components/Pagination";
+import { SearchSelect } from "@/components/SearchSelect";
 import type { Pedido, Tarea } from "@/types";
 
 const DONE = "COMPLETADA";
+
+function pedidoVigente(pedido: Pedido): boolean {
+  if (pedido.estado === "CANCELADO") return false;
+  if (pedido.estado === "ENTREGADO" && toNumber(pedido.restaPagar) < 0.01) return false;
+  return true;
+}
+
+function fechaEntregaOrden(pedido: Pedido): number | null {
+  if (!pedido.fechaEntrega) return null;
+  const fecha = new Date(pedido.fechaEntrega).getTime();
+  return Number.isNaN(fecha) ? null : fecha;
+}
 
 export function TareasPage() {
   const { user } = useAuth();
@@ -34,6 +53,7 @@ export function TareasPage() {
   const [descripcion, setDescripcion] = useState("");
   const [fechaLimite, setFechaLimite] = useState("");
   const [pedidoId, setPedidoId] = useState("");
+  const [mostrarFinalizados, setMostrarFinalizados] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<Tarea | null>(null);
@@ -47,11 +67,34 @@ export function TareasPage() {
   const pendientes = tareas.filter((t) => t.estado !== DONE);
   const completadas = tareas.filter((t) => t.estado === DONE);
 
+  const pedidoOptions = useMemo(() => {
+    return (pedidos ?? [])
+      .filter(
+        (pedido) =>
+          mostrarFinalizados || pedidoVigente(pedido) || String(pedido.id) === pedidoId,
+      )
+      .sort((a, b) => {
+        const fechaA = fechaEntregaOrden(a);
+        const fechaB = fechaEntregaOrden(b);
+        if (fechaA === null && fechaB === null) return b.id - a.id;
+        if (fechaA === null) return 1;
+        if (fechaB === null) return -1;
+        return fechaA === fechaB ? b.id - a.id : fechaA - fechaB;
+      })
+      .map((pedido) => ({
+        value: String(pedido.id),
+        label: etiquetaPedido(pedido),
+        secondary: textoEntregaPedido(pedido),
+        searchText: textoBusquedaPedido(pedido),
+      }));
+  }, [pedidos, mostrarFinalizados, pedidoId]);
+
   function openForm() {
     setTitulo("");
     setDescripcion("");
     setFechaLimite("");
     setPedidoId("");
+    setMostrarFinalizados(false);
     setFormError(null);
     setFormOpen(true);
   }
@@ -147,7 +190,18 @@ export function TareasPage() {
                 <p className={cn("truncate font-medium", done && "text-muted line-through")} title={t.titulo}>{t.titulo}</p>
                 {t.descripcion && <p className="mt-0.5 max-w-prose text-sm text-muted text-pretty">{t.descripcion}</p>}
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  {t.pedidoId && <Badge tone="primary">Pedido #{t.pedidoId}</Badge>}
+                  {t.pedidoId && (
+                    <Badge tone="primary">
+                      <span className="mr-1 text-[0.65rem] opacity-70">#{t.pedidoId}</span>
+                      {t.pedido ? (
+                        <span className="max-w-[24rem] truncate" title={etiquetaPedido(t.pedido)}>
+                          {nombreClientePedido(t.pedido)} · {detallePedido(t.pedido, 45)}
+                        </span>
+                      ) : (
+                        <span>Pedido #{t.pedidoId}</span>
+                      )}
+                    </Badge>
+                  )}
                   {t.fechaLimite && (
                     <Badge tone={overdue ? "danger" : "neutral"}>
                       <CalendarClock className="mr-1 size-3" aria-hidden="true" />
@@ -247,14 +301,24 @@ export function TareasPage() {
               <Input id="t-fecha" type="date" value={fechaLimite} onChange={(e) => setFechaLimite(e.target.value)} />
             </Field>
             <Field label="Pedido" htmlFor="t-pedido">
-              <Select id="t-pedido" value={pedidoId} onChange={(e) => setPedidoId(e.target.value)}>
-                <option value="">Sin pedido</option>
-                {pedidos?.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    Pedido #{p.id} · {p.estado}
-                  </option>
-                ))}
-              </Select>
+              <SearchSelect
+                id="t-pedido"
+                options={pedidoOptions}
+                value={pedidoId}
+                onChange={setPedidoId}
+                placeholder="Buscar pedido…"
+                emptyLabel="Sin pedido"
+                clearable
+              />
+              <label className="mt-1 flex w-fit items-center gap-2 text-xs text-muted">
+                <input
+                  type="checkbox"
+                  className="size-3.5 accent-primary"
+                  checked={mostrarFinalizados}
+                  onChange={(e) => setMostrarFinalizados(e.target.checked)}
+                />
+                Mostrar también pedidos finalizados
+              </label>
             </Field>
           </div>
           {formError && <ErrorBanner message={formError} />}

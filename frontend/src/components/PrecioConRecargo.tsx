@@ -6,6 +6,7 @@ import {
   formatPorcentaje,
   gananciaUnitaria,
   margenSobreVenta,
+  precioAlCambiarCosto,
   precioDesdeCosto,
   recargoDesdePrecio,
 } from "@/lib/precio";
@@ -70,9 +71,12 @@ export function PrecioConRecargo({
   showResumen = true,
   hint,
 }: PrecioConRecargoProps) {
-  const [porcentaje, setPorcentaje] = useState(() => porcentajeDesde(costo, precio));
+  const [porcentaje, setPorcentaje] = useState(() => porcentajeDesde(costo, precio) || "0");
   const [ultimo, setUltimo] = useState<Campo>("precio");
   const emision = useRef<{ costo: string; precio: string } | null>(null);
+  // Distingue un precio cargado a mano (se conserva al cambiar el costo) de
+  // uno calculado automáticamente desde el costo o el recargo.
+  const precioManual = useRef((numero(precio) ?? 0) > 0);
 
   // Si los valores cambian desde afuera (abrir el modal, elegir un producto),
   // recalculamos el % sin tocar el precio que cargó el usuario.
@@ -82,7 +86,8 @@ export function PrecioConRecargo({
       emision.current = null;
       return;
     }
-    setPorcentaje(porcentajeDesde(costo, precio));
+    precioManual.current = (numero(precio) ?? 0) > 0;
+    setPorcentaje(porcentajeDesde(costo, precio) || "0");
     setUltimo("precio");
   }, [costo, precio]);
 
@@ -90,11 +95,19 @@ export function PrecioConRecargo({
     setUltimo("costo");
     onChangeCosto(valor);
     const c = numero(valor);
-    const pct = numero(porcentaje);
-    if (c !== null && pct !== null) {
-      const nuevoPrecio = textoNumero(precioDesdeCosto(c, pct));
-      emision.current = { costo: valor, precio: nuevoPrecio };
-      onChangePrecio(nuevoPrecio);
+    const p = numero(precio);
+    const conservarPrecio = precioManual.current && p !== null && p > 0;
+    if (c !== null) {
+      const nuevoPrecio = textoNumero(
+        precioAlCambiarCosto(c, conservarPrecio ? p : null, numero(porcentaje)),
+      );
+      const cambiaPrecio = nuevoPrecio !== precio;
+      emision.current = { costo: valor, precio: cambiaPrecio ? nuevoPrecio : precio };
+      if (cambiaPrecio) onChangePrecio(nuevoPrecio);
+      // Si ya había un precio cargado a mano, se conserva y el recargo se recalcula.
+      if (conservarPrecio) {
+        setPorcentaje(porcentajeDesde(valor, precio) || "0");
+      }
     } else {
       emision.current = { costo: valor, precio };
     }
@@ -103,6 +116,7 @@ export function PrecioConRecargo({
   function cambiarPorcentaje(valor: string) {
     setPorcentaje(valor);
     setUltimo("porcentaje");
+    precioManual.current = false;
     const c = numero(costo);
     const pct = numero(valor);
     if (c !== null && pct !== null) {
@@ -114,23 +128,25 @@ export function PrecioConRecargo({
 
   function cambiarPrecio(valor: string) {
     setUltimo("precio");
+    precioManual.current = (numero(valor) ?? 0) > 0;
     onChangePrecio(valor);
-    setPorcentaje(porcentajeDesde(costo, valor));
+    setPorcentaje(porcentajeDesde(costo, valor) || "0");
     emision.current = { costo, precio: valor };
   }
 
   const c = numero(costo);
   const p = numero(precio);
-  const ganancia = c !== null && p !== null ? gananciaUnitaria(c, p) : null;
-  const recargo = c !== null && p !== null ? recargoDesdePrecio(c, p) : null;
-  const margen = c !== null && p !== null ? margenSobreVenta(c, p) : null;
+  const precioCargado = p !== null && p > 0;
+  const ganancia = c !== null && precioCargado ? gananciaUnitaria(c, p) : null;
+  const recargo = c !== null && precioCargado ? recargoDesdePrecio(c, p) : null;
+  const margen = c !== null && precioCargado ? margenSobreVenta(c, p) : null;
 
   const indicador =
-    ultimo === "precio"
-      ? p !== null && c !== null
-        ? `Recargo calculado desde el precio: ${formatPorcentaje(recargo)} sobre el costo.`
-        : "El precio manda: el recargo se calcula solo cuando hay costo."
-      : `Precio calculado desde el costo + ${porcentaje || "0"} %.`;
+    ultimo === "porcentaje"
+      ? `Precio calculado desde el costo + ${porcentaje || "0"} %.`
+      : precioCargado && c !== null
+        ? `Recargo actual sobre el costo: ${formatPorcentaje(recargo)}.`
+        : "El precio manda: el recargo se calcula solo cuando hay costo.";
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>

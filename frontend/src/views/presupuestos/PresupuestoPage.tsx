@@ -632,11 +632,13 @@ export function PresupuestoPage() {
           {borrador.lineas.map((linea, indice) => {
             const costo = linea.costoUnitario === "" ? null : toNumber(linea.costoUnitario);
             const precio = toNumber(linea.precioUnitario);
+            const precioCargado = precio > 0;
             const cantidad = toNumber(linea.cantidad);
-            const ganancia = costo === null ? null : gananciaUnitaria(costo, precio) * cantidad;
-            const margen = costo === null ? null : margenSobreVenta(costo, precio);
-            const recargo = costo === null ? null : recargoDesdePrecio(costo, precio);
-            const bajoCosto = costo !== null && precio < costo;
+            const ganancia =
+              costo === null || !precioCargado ? null : gananciaUnitaria(costo, precio) * cantidad;
+            const margen = costo === null || !precioCargado ? null : margenSobreVenta(costo, precio);
+            const recargo = costo === null || !precioCargado ? null : recargoDesdePrecio(costo, precio);
+            const bajoCosto = costo !== null && precioCargado && precio < costo;
 
             return (
               <div key={linea.key} className="rounded-xl border border-line bg-background/40 p-4">

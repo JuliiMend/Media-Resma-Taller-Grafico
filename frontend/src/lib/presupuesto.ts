@@ -196,6 +196,9 @@ export function calcularTotales(borrador: BorradorPresupuesto): TotalesPresupues
     const costo = toNumber(l.costoUnitario);
     const cantidad = toNumber(l.cantidad);
     const precio = toNumber(l.precioUnitario);
+    // Sin precio cargado todavía no hay venta: no debe afectar margen,
+    // recargo ni el aviso de bajo costo.
+    if (precio <= 0) continue;
     costoTotal += costo * cantidad;
     subtotalConCosto += precio * cantidad;
     if (precio < costo) lineasBajoCosto += 1;

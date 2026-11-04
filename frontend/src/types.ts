@@ -80,6 +80,20 @@ export interface Trabajo {
   valorUnitario: Decimal;
   costoUnitario?: Decimal | null;
   estadoProducto?: string | null;
+  producto?: { nombre: string } | null;
+}
+
+/** Datos mínimos de un pedido para armar etiquetas en tareas y selectores. */
+export interface PedidoEtiquetaData {
+  id: number;
+  estado?: string | null;
+  fechaEntrega?: string | null;
+  observaciones?: string | null;
+  cliente?: { nombre: string } | null;
+  trabajos?: Array<{
+    descripcion?: string | null;
+    producto?: { nombre: string } | null;
+  }> | null;
 }
 
 export interface Pedido {
@@ -211,4 +225,5 @@ export interface Tarea {
   estado: string;
   fechaLimite?: string | null;
   creadoEn: string;
+  pedido?: PedidoEtiquetaData | null;
 }
